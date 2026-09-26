@@ -8,6 +8,10 @@ and where it turns on the opt-in [policy checks](#policy-checks).
 
 ## ShellCheck
 
+Use `actionlint --log-level debug` to inspect each script's selected dialect,
+working directory, rc arguments, inline directives and effective command options.
+The log explains when an unresolved working directory disables source following.
+
 Configure ShellCheck in the same `.github/actionlint.yaml` or `.github/actionlint.yml`
 that actionlint already discovers. Both the CLI and GitHub Action apply it automatically:
 
@@ -17,7 +21,7 @@ tools:
     enabled: true
     config:
       disable: [SC2086]
-      enable: [check-unassigned-uppercase]
+      enable: [quote-safe-variables]
       extended-analysis: true
       external-sources: true
       source-path: [scripts]
@@ -87,6 +91,11 @@ The inline mapping accepts these native project-wide settings:
 
 These settings apply to each checked shell script. `shell` overrides its inferred
 dialect; it does not turn Python or PowerShell steps into shell scripts.
+
+actionlint's built-in ShellCheck exclusions still apply to optional checks.
+`check-unassigned-uppercase` produces SC2154, which actionlint suppresses because
+workflow environment variables can be supplied externally. This applies equally
+to inline settings, rc files, script directives and command-line options.
 
 ### Script selection and directives
 
