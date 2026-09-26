@@ -15,19 +15,18 @@ import (
 // of host filesystem permissions and of ShellCheck availability.
 type RuleExecutableBit struct {
 	RuleBase
+	executableState
 	context                             ruleContext
 	workflowDir, jobDir                 runDirectory
 	workflowShell, jobShell             shellValue
 	paths                               runPaths
-	unix, sequential, pristine          bool
-	changed                             map[string]bool
+	unix                                bool
 	workflowEnv, jobEnv                 bool
 	workflowGitEnv, jobGitEnv           bool
 	workflowPathUnknown, jobPathUnknown bool
 	pathUnknown                         bool
 	caseInsensitive                     bool
 	shIsDash                            bool
-	repositoryUnknown                   bool
 	callerRepositoryUnknown             bool
 }
 
@@ -60,9 +59,7 @@ func (rule *RuleExecutableBit) VisitJobPre(job *Job) error {
 	if enabled, known := invocationCondition(job.If); known && !enabled {
 		rule.unix = false
 	}
-	rule.sequential, rule.pristine = true, false
-	rule.repositoryUnknown = rule.callerRepositoryUnknown || !knownHostedRunner(job.RunsOn)
-	rule.changed = make(map[string]bool)
+	rule.executableState = newExecutableState(knownHostedRunner(job.RunsOn), rule.callerRepositoryUnknown)
 	rule.paths = runPaths{workspace: rule.context.projectRoot, analysis: rule.context.workingDir, platform: runnerPlatform(job.RunsOn)}
 	return nil
 }
@@ -76,15 +73,15 @@ func (rule *RuleExecutableBit) VisitStep(step *Step) error {
 		return nil
 	}
 	if stepCanRunAfterFailure(step.If) {
-		rule.pristine, rule.repositoryUnknown = false, true
+		rule.afterPossibleFailure()
 	}
 	if boolMayBeTrue(step.Background) {
-		rule.sequential, rule.pristine = false, false
+		rule.afterConcurrentExecution()
 		return nil
 	}
 	switch command := step.Exec.(type) {
 	case *ExecParallel:
-		rule.sequential, rule.pristine = false, false
+		rule.afterConcurrentExecution()
 	case *ExecAction:
 		if rule.jobGitEnv || checkoutEnvironmentUnknown(step.Env) {
 			rule.repositoryUnknown = true
@@ -264,9 +261,7 @@ func (rule *RuleExecutableBit) checkout(action *ExecAction, mayNotComplete bool)
 		return
 	}
 	rule.paths.checkout = checkout
-	rule.pristine = true
-	rule.repositoryUnknown = false
-	clear(rule.changed)
+	rule.afterKnownCheckout()
 }
 
 func checkoutInput(action *ExecAction, name string) (string, bool) {
