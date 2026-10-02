@@ -27,10 +27,10 @@ test('pending draft tags resolve through gh before fetching the release by ID', 
 	const release = { id: 77, tag_name: 'v1.17.1', draft: true };
 	/** @type {string[][]} */
 	const calls = [];
-	const found = findRelease('kjanat/actionlint', 'v1.17.1', (args) => {
+	const found = findRelease('kajaux/actionlint', 'v1.17.1', (args) => {
 		calls.push(args);
 		if (args[0] === 'release') return '77';
-		assert.deepEqual(args, ['api', 'repos/kjanat/actionlint/releases/77']);
+		assert.deepEqual(args, ['api', 'repos/kajaux/actionlint/releases/77']);
 		return JSON.stringify(release);
 	});
 	assert.deepEqual(found, release);
@@ -39,19 +39,19 @@ test('pending draft tags resolve through gh before fetching the release by ID', 
 		'view',
 		'v1.17.1',
 		'--repo',
-		'kjanat/actionlint',
+		'kajaux/actionlint',
 		'--json',
 		'databaseId',
 		'--jq',
 		'.databaseId',
 	]);
-	assert.throws(() => findRelease('kjanat/actionlint', 'v1.17.1', () => 'null'), /release ID/);
+	assert.throws(() => findRelease('kajaux/actionlint', 'v1.17.1', () => 'null'), /release ID/);
 });
 
 function exampleManifest() {
 	return parseManifest({
 		schema_version: 1,
-		repository: 'kjanat/actionlint',
+		repository: 'kajaux/actionlint',
 		version: '1.17.1',
 		tag: 'v1.17.1',
 		workflow: workflowPath,
@@ -81,9 +81,9 @@ test('candidate provenance requires the successful exact workflow attempt and so
 		run_attempt: 2,
 		event: 'workflow_dispatch',
 		path: workflowPath,
-		head_branch: 'master',
+		head_branch: 'tests',
 		head_sha: manifest.source,
-		repository: { full_name: 'kjanat/actionlint' },
+		repository: { full_name: 'kajaux/actionlint' },
 		status: 'completed',
 		conclusion: 'success',
 	};
@@ -177,7 +177,7 @@ await writeFile(join(directory, 'SHA256SUMS'), createHash('sha256').update(code)
 			await writeFile(join(assets, `${name}.digest`), `sha256:${'a'.repeat(64)}\n`);
 		}
 		const manifest = await writeManifest(root, assets, { version, source, candidate }, {
-			GITHUB_REPOSITORY: 'kjanat/actionlint',
+			GITHUB_REPOSITORY: 'kajaux/actionlint',
 			GITHUB_RUN_ID: '123',
 			GITHUB_RUN_ATTEMPT: '2',
 		});
@@ -256,8 +256,8 @@ function promotionFixture() {
 		git: (...args) => {
 			const [cmd, ...rest] = args;
 			if (cmd === 'ls-remote') {
-				return rest[1] === 'refs/heads/master'
-					? `${state.remoteHead}\trefs/heads/master`
+				return rest[1] === 'refs/heads/tests'
+					? `${state.remoteHead}\trefs/heads/tests`
 					: state.remoteTag && `${state.remoteTag}\trefs/tags/${manifest.tag}`;
 			}
 			if (cmd === 'tag') return state.localTag ? manifest.tag : '';
@@ -274,7 +274,7 @@ function promotionFixture() {
 			}
 			if (cmd === 'cat-file') return rest[0] === '-t' ? 'tag' : '-----BEGIN PGP SIGNATURE-----';
 			if (cmd === 'verify-tag' || cmd === 'status') return '';
-			if (cmd === 'branch') return 'master';
+			if (cmd === 'branch') return 'tests';
 			if (cmd === 'fetch') {
 				state.localTag = state.remoteTag;
 				return '';
@@ -471,7 +471,7 @@ test('real signed promotion survives rejected pushes and lost responses without 
 				})
 			) git(cwd, 'config', name, value);
 		};
-		git(root, 'init', '--quiet', '--initial-branch=master');
+		git(root, 'init', '--quiet', '--initial-branch=tests');
 		configure(root);
 		const sourceFiles = {
 			'action.yml': 'runs: {using: node24, main: action.mjs}\n',
@@ -482,9 +482,9 @@ test('real signed promotion survives rejected pushes and lost responses without 
 		git(root, 'add', '.');
 		git(root, 'commit', '--quiet', '-m', 'Prepared source');
 		const source = git(root, 'rev-parse', 'HEAD');
-		git(root, 'init', '--quiet', '--bare', '--initial-branch=master', remote);
+		git(root, 'init', '--quiet', '--bare', '--initial-branch=tests', remote);
 		git(root, 'remote', 'add', 'origin', remote);
-		git(root, 'push', '--quiet', 'origin', 'master');
+		git(root, 'push', '--quiet', 'origin', 'tests');
 		const directory = join(temporary, 'prepared');
 		const action = join(directory, 'action');
 		await mkdir(action, { recursive: true });
@@ -531,12 +531,12 @@ test('real signed promotion survives rejected pushes and lost responses without 
 		const tagObject = git(root, 'rev-parse', `refs/tags/${manifest.tag}`);
 		const recorded = git(root, 'rev-parse', 'HEAD');
 		assert.equal(git(remote, 'tag', '--list'), '');
-		assert.equal(git(remote, 'rev-parse', 'master'), source);
+		assert.equal(git(remote, 'rev-parse', 'tests'), source);
 		assert.equal(publishCount, 0);
 		await rm(hook);
 		losePushResponse = true;
 		assert.throws(() => finalizePromotion(manifest, release(), operations(root)), /verify or resume the atomic push/);
-		assert.equal(git(remote, 'rev-parse', 'master'), recorded);
+		assert.equal(git(remote, 'rev-parse', 'tests'), recorded);
 		assert.equal(git(remote, 'rev-parse', `refs/tags/${manifest.tag}`), tagObject);
 		assert.throws(() => finalizePromotion(manifest, release(), operations(root)), /resume draft publication/);
 		assert.equal(draft, true);
@@ -551,8 +551,8 @@ test('real signed promotion survives rejected pushes and lost responses without 
 		assert.equal(publishCount, 2);
 		assert.equal(git(remote, 'rev-parse', `refs/tags/${manifest.tag}`), tagObject);
 		assert.equal(git(remote, 'rev-parse', `${manifest.tag}^{commit}`), candidate);
-		assert.equal(git(remote, 'rev-list', '--parents', '-n', '1', 'master'), `${recorded} ${source} ${candidate}`);
-		assert.equal(git(remote, 'rev-parse', 'master^{tree}'), git(root, 'rev-parse', `${source}^{tree}`));
+		assert.equal(git(remote, 'rev-list', '--parents', '-n', '1', 'tests'), `${recorded} ${source} ${candidate}`);
+		assert.equal(git(remote, 'rev-parse', 'tests^{tree}'), git(root, 'rev-parse', `${source}^{tree}`));
 		git(resumed, 'verify-tag', manifest.tag);
 		for (const [name, bytes] of Object.entries({ 'action.mjs': bundle, SHA256SUMS: checksum })) {
 			assert.deepEqual(execFileSync('git', ['show', `${manifest.tag}:${name}`], { cwd: remote, env }), bytes);
@@ -601,14 +601,14 @@ gh() {
   done
   [[ "$paginate" == true ]] || return 2
   case "$endpoint" in
-    repos/kjanat/actionlint/actions/workflows/release.yml/runs)
+    repos/kajaux/actionlint/actions/workflows/release.yml/runs)
       jq -c --arg status "$status" --arg event "$event" --arg head "$head" '
         .workflow_runs |= map(select(
           ($status == "" or .status == $status or .conclusion == $status) and
           ($event == "" or .event == $event) and ($head == "" or .head_sha == $head)
         ))' <<< "$MOCK_RUN_PAGES" | jq -r "$selector"
       ;;
-    repos/kjanat/actionlint/actions/runs/*/jobs)
+    repos/kajaux/actionlint/actions/runs/*/jobs)
       [[ "$MOCK_JOBS_ERROR" == false ]] || return 1
       local run_id="\${endpoint%/jobs}"
       run_id="\${run_id##*/}"
@@ -672,7 +672,7 @@ for (
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				GITHUB_REPOSITORY: 'kjanat/actionlint',
+				GITHUB_REPOSITORY: 'kajaux/actionlint',
 				RELEASE_TAG: 'v1.17.1',
 				MOCK_COMMIT: verifiedReleaseRun.head_sha,
 				MOCK_PUBLISHED: String(scenario.published !== false),

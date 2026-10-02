@@ -1,5 +1,5 @@
 // Compile against the package export, as an npm consumer would.
-import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kjanat/actionlint/result';
+import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kajaux/actionlint/result';
 
 export function completedStatus(result: CheckResult): 0 | 1 | undefined {
 	if (result.completed) return result.exit_code;

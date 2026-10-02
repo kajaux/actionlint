@@ -172,7 +172,7 @@ func changelogRelease(content []byte, v version) error {
 	return err
 }
 
-const changelogRepoURL = "https://github.com/kjanat/actionlint"
+const changelogRepoURL = "https://github.com/kajaux/actionlint"
 
 var changelogUnreleased = regexp.MustCompile(`(?m)^` + unreleasedHeading + `[ \t]*\r?$`)
 

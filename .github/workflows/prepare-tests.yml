@@ -1,0 +1,17 @@
+name: Prepare tests
+on:
+  workflow_dispatch:
+    inputs:
+      source-repository: { description: Source repository, required: true, default: kjanat/actionlint, type: string }
+      source-ref: { description: "Source branch, tag or commit", required: true, type: string }
+      version: { description: Unused stable release version, required: true, type: string }
+permissions: { contents: read, actions: read }
+jobs:
+  prepare:
+    uses: kajaux/actionlint/.github/workflows/prepare-tests.yml@patches
+    with:
+      source-repository: ${{ inputs.source-repository }}
+      source-ref: ${{ inputs.source-ref }}
+      version: ${{ inputs.version }}
+    secrets:
+      TOKTOK: ${{ secrets.TOKTOK }}

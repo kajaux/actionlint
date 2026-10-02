@@ -269,10 +269,10 @@ export function verifyRun(value, manifest) {
 	const repository = object(run.repository, 'workflow repository');
 	if (
 		run.id !== manifest.run_id || run.run_attempt !== manifest.run_attempt
-		|| run.event !== 'workflow_dispatch' || run.path !== workflowPath || run.head_branch !== 'master'
+		|| run.event !== 'workflow_dispatch' || run.path !== workflowPath || run.head_branch !== 'tests'
 		|| run.head_sha !== manifest.source || repository.full_name !== manifest.repository
 		|| run.status !== 'completed' || run.conclusion !== 'success'
-	) throw new Error('Candidate does not match a successful release preparation run on master');
+	) throw new Error('Candidate does not match a successful release preparation run on tests');
 }
 
 /** @param {string} root @param {string} endpoint @param {Record<string, unknown>} [body] @returns {unknown} */
@@ -355,19 +355,19 @@ export function finalizePromotion(manifest, release, operations) {
 		return { tag: manifest.tag, releaseID, alreadyPublished: true };
 	}
 	if (release.target_commitish !== manifest.source) throw new Error('Draft target differs from prepared source');
-	if (runGit('branch', '--show-current') !== 'master' || runGit('status', '--porcelain', '--untracked-files=all')) {
-		throw new Error('Promotion requires a clean master checkout');
+	if (runGit('branch', '--show-current') !== 'tests' || runGit('status', '--porcelain', '--untracked-files=all')) {
+		throw new Error('Promotion requires a clean tests checkout');
 	}
 	let head = runGit('rev-parse', 'HEAD');
 	if (head !== manifest.source && !isRecordedRelease(runGit, head, manifest)) {
 		throw new Error('Source advanced since preparation; prepare a new candidate or return to the prepared source');
 	}
-	const remoteHead = runGit('ls-remote', 'origin', 'refs/heads/master').split('\t')[0];
+	const remoteHead = runGit('ls-remote', 'origin', 'refs/heads/tests').split('\t')[0];
 	commitValue(remoteHead);
 	if (remoteHead !== manifest.source && remoteHead !== head) {
-		runGit('fetch', '--no-tags', '--no-write-fetch-head', 'origin', 'refs/heads/master');
+		runGit('fetch', '--no-tags', '--no-write-fetch-head', 'origin', 'refs/heads/tests');
 		if (!isRecordedRelease(runGit, remoteHead, manifest) || head !== manifest.source) {
-			throw new Error('Remote master advanced since preparation');
+			throw new Error('Remote tests advanced since preparation');
 		}
 		runGit('merge', '--ff-only', remoteHead);
 		head = remoteHead;
@@ -387,7 +387,7 @@ export function finalizePromotion(manifest, release, operations) {
 		}
 	}
 	try {
-		runGit('-c', 'push.followTags=false', 'push', '--atomic', 'origin', 'HEAD:refs/heads/master', `${ref}:${ref}`);
+		runGit('-c', 'push.followTags=false', 'push', '--atomic', 'origin', 'HEAD:refs/heads/tests', `${ref}:${ref}`);
 	} catch (error) {
 		throw new Error(
 			`The signed tag and ancestry commit are prepared. Rerun promotion with --version ${manifest.version} --run ${manifest.run_id} to verify or resume the atomic push.`,

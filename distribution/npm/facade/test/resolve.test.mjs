@@ -72,8 +72,8 @@ after(() => {
 
 describe('platformPackage', () => {
 	test('follows the <scope>/<binary>-<os>-<cpu> convention', () => {
-		assert.equal(platformPackage(SCOPE, BINARY, 'linux', 'x64'), '@kjanat-actionlint/actionlint-linux-x64');
-		assert.equal(platformPackage(SCOPE, BINARY, 'win32', 'arm64'), '@kjanat-actionlint/actionlint-win32-arm64');
+		assert.equal(platformPackage(SCOPE, BINARY, 'linux', 'x64'), '@kajaux/actionlint-linux-x64');
+		assert.equal(platformPackage(SCOPE, BINARY, 'win32', 'arm64'), '@kajaux/actionlint-win32-arm64');
 	});
 
 	test('derives exactly the names targets.json declares', () => {
@@ -90,7 +90,7 @@ describe('platformPackage', () => {
 describe('resolveBinary', () => {
 	test('resolves the package matching the host', () => {
 		const path = resolveBinary('actionlint', context({ platform: 'linux', arch: 'x64' }));
-		assert.equal(path, join('/fake/node_modules/@kjanat-actionlint/actionlint-linux-x64', 'bin', 'actionlint'));
+		assert.equal(path, join('/fake/node_modules/@kajaux/actionlint-linux-x64', 'bin', 'actionlint'));
 	});
 
 	test('appends .exe on Windows only', () => {

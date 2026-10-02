@@ -420,7 +420,7 @@ func gitRepo(t *testing.T) *repo {
 			t.Fatal(err)
 		}
 	}
-	run("init", "--initial-branch=master")
+	run("init", "--initial-branch=tests")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "test")
 	run("config", "commit.gpgsign", "false")
@@ -526,13 +526,13 @@ func releaseRepo(t *testing.T) *repo {
 - Test release notes.
 
 <a id="v9.9.8"></a>
-## [v9.9.8](https://github.com/kjanat/actionlint/releases/tag/v9.9.8) - 2026-01-01
+## [v9.9.8](https://github.com/kajaux/actionlint/releases/tag/v9.9.8) - 2026-01-01
 
 - Previous release.
 
 [Changes][v9.9.8]
 
-[v9.9.8]: https://github.com/kjanat/actionlint/compare/v9.9.7...v9.9.8
+[v9.9.8]: https://github.com/kajaux/actionlint/compare/v9.9.7...v9.9.8
 `
 	if err := os.WriteFile(filepath.Join(r.root, changelogFile), []byte(changelog), 0o644); err != nil {
 		t.Fatal(err)
@@ -616,13 +616,13 @@ func TestCheckChangelogAcceptsUnreleasedEntries(t *testing.T) {
 - Report ShellCheck findings at their source locations.
 
 <a id="v1.10.0"></a>
-# [v1.10.0](https://github.com/kjanat/actionlint/releases/tag/v1.10.0) - 2026-08-19
+# [v1.10.0](https://github.com/kajaux/actionlint/releases/tag/v1.10.0) - 2026-08-19
 
 - Move the module.
 
 [Changes][v1.10.0]
 
-[v1.10.0]: https://github.com/kjanat/actionlint/compare/v1.9.0...v1.10.0
+[v1.10.0]: https://github.com/kajaux/actionlint/compare/v1.9.0...v1.10.0
 `)
 	if err := checkChangelog(root); err != nil {
 		t.Fatal(err)
@@ -680,13 +680,13 @@ const oneChangelogSection = `<a id="unreleased"></a>
 
 <a id="v1.11.0"></a>
 
-# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0) - 2026-08-20
+# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0) - 2026-08-20
 
 - Release the thing.
 
 [Changes][v1.11.0]
 
-[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0
+[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0
 `
 
 func TestCheckChangelogSectionsAcceptsCompleteSection(t *testing.T) {
@@ -714,10 +714,10 @@ func TestSectionizeChangelogCreatesSection(t *testing.T) {
 		t.Fatalf("the Unreleased heading still lists %v", entries)
 	}
 	text := string(content)
-	if !strings.Contains(text, "## [v1.12.0](https://github.com/kjanat/actionlint/releases/tag/v1.12.0) - 2026-08-28") {
+	if !strings.Contains(text, "## [v1.12.0](https://github.com/kajaux/actionlint/releases/tag/v1.12.0) - 2026-08-28") {
 		t.Fatalf("the section heading is missing:\n%s", text)
 	}
-	if !strings.Contains(text, "[v1.12.0]: https://github.com/kjanat/actionlint/compare/v1.11.0...v1.12.0\n[v1.11.0]:") {
+	if !strings.Contains(text, "[v1.12.0]: https://github.com/kajaux/actionlint/compare/v1.11.0...v1.12.0\n[v1.11.0]:") {
 		t.Fatalf("the link definition is missing or misplaced:\n%s", text)
 	}
 }
@@ -748,16 +748,16 @@ func TestSectionizeChangelogFirstRelease(t *testing.T) {
 	if err := checkChangelogSections(content); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), "[v1.0.0]: https://github.com/kjanat/actionlint/tree/v1.0.0") {
+	if !strings.Contains(string(content), "[v1.0.0]: https://github.com/kajaux/actionlint/tree/v1.0.0") {
 		t.Fatalf("the first release link definition is missing:\n%s", content)
 	}
 }
 
 func TestCheckChangelogSectionsRejectsIncompleteSection(t *testing.T) {
 	for name, drop := range map[string]string{
-		"heading":         "# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0) - 2026-08-20",
+		"heading":         "# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0) - 2026-08-20",
 		"changes link":    "[Changes][v1.11.0]",
-		"link definition": "[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0",
+		"link definition": "[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0",
 	} {
 		t.Run(name, func(t *testing.T) {
 			content := strings.Replace(oneChangelogSection, drop, "", 1)
@@ -866,8 +866,8 @@ func TestChangelogReleaseRejects(t *testing.T) {
 func TestCheckChangelogSectionsRejectsBrokenSection(t *testing.T) {
 	for name, tc := range map[string]struct{ from, to, want string }{
 		"heading of another release": {
-			"# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0)",
-			"# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.10.0)",
+			"# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0)",
+			"# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.10.0)",
 			"links to the release page of v1.10.0",
 		},
 		"changes link of another release": {
@@ -876,8 +876,8 @@ func TestCheckChangelogSectionsRejectsBrokenSection(t *testing.T) {
 			"links its changes to v1.10.0",
 		},
 		"link definition of another release": {
-			"[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0",
-			"[v1.10.0]: https://github.com/kjanat/actionlint/compare/v1.9.0...v1.10.0",
+			"[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0",
+			"[v1.10.0]: https://github.com/kajaux/actionlint/compare/v1.9.0...v1.10.0",
 			"declares no v1.10.0 section",
 		},
 		"link definition pointing elsewhere": {

@@ -28,7 +28,7 @@ concurrency:
 
 env:
   GO: "1.27"
-  REGISTRY: https://registry.npmjs.org/
+  REGISTRY: https://npm.pkg.github.com/
   RELEASE_TAG: ${{ inputs.tag }}
   DRY_RUN: ${{ inputs.dry-run || 'false' }}
 
@@ -42,6 +42,8 @@ jobs:
       platforms: ${{ steps.pack.outputs.platforms }}
       node: ${{ steps.node.outputs.version }}
     steps:
+      - name: Require the test repository
+        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: { ref: "${{ case(inputs.dry-run, github.sha, format('refs/tags/{0}', env.RELEASE_TAG)) }}", persist-credentials: false }
       # Manual recovery requires verified release bytes even if a later publishing job failed.
@@ -79,7 +81,7 @@ jobs:
           - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
             with: { go-version: "${{ env.GO }}", check-latest: true }
           - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-            with: { node-version-file: .node-version, registry-url: "${{ env.REGISTRY }}" }
+            with: { node-version-file: .node-version, registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
 
       # The publish jobs check out nothing, so .node-version cannot reach them.
       # Passing the version this job resolved keeps one source of truth.
@@ -165,7 +167,7 @@ jobs:
             unpack "distribution/npm/tarballs/${pkg}.tgz" "${scope}/actionlint-${pkg}"
           done
           cmp actionlint.schema.json "${facade}/actionlint.schema.json"
-          (cd "${smoke}" && node -e 'require("@kjanat/actionlint/schema")')
+          (cd "${smoke}" && node -e 'require(process.argv[1] + "/schema")' "$(jq -r .facade "${GITHUB_WORKSPACE}/distribution/npm/targets.json")")
           got="$(node "${facade}/bin/actionlint.mjs" -version | head -1)"
           echo "launcher reported: ${got}"
           case "${got}" in
@@ -186,27 +188,27 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with: { name: npm-tarballs, path: distribution/npm/tarballs, retention-days: 7 }
 
-  # Leaves first: the facade pins them exactly. One job per package, each with
-  # its own deployment, from the environment named in its npm trusted publisher.
+  # Leaves first: the facade pins them exactly. Publish the tested tarballs
+  # into the isolated repository's GitHub Packages namespace.
   platforms:
     name: publish ${{ matrix.pkg }}
     needs: build
     runs-on: ubuntu-latest
-    permissions: { contents: read, id-token: write }
+    permissions: { contents: read, packages: write }
     environment:
       name: npm-actionlint
       url: ${{ steps.publish.outputs.url }}
     env:
-      # Set per job: an environment's variables only resolve inside the job
-      # deploying to it. PROVENANCE=false opts out; a dry run forces it off.
-      NPM_CONFIG_PROVENANCE: ${{ (inputs.dry-run && 'false') || vars.PROVENANCE || 'true' }}
+      # GitHub Packages uses GITHUB_TOKEN; npmjs trusted publishing is not exercised.
+      NPM_CONFIG_PROVENANCE: "false"
+      NODE_AUTH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
         pkg: ${{ fromJSON(needs.build.outputs.platforms) }}
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}" }
+        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with: { name: npm-tarballs, path: tarballs }
       - uses: $/.github/actions/npm-publish
@@ -220,15 +222,16 @@ jobs:
     name: publish the facade
     needs: [build, platforms]
     runs-on: ubuntu-latest
-    permissions: { contents: read, id-token: write }
+    permissions: { contents: read, packages: write }
     environment:
       name: npm
       url: ${{ steps.publish.outputs.url }}
     env:
-      NPM_CONFIG_PROVENANCE: ${{ (inputs.dry-run && 'false') || vars.PROVENANCE || 'true' }}
+      NPM_CONFIG_PROVENANCE: "false"
+      NODE_AUTH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}" }
+        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with: { name: npm-tarballs, path: tarballs }
       - uses: $/.github/actions/npm-publish
@@ -237,3 +240,41 @@ jobs:
           tarball: tarballs/facade.tgz
           dist-tag: "${{ needs.build.outputs.dist-tag }}"
           dry-run: "${{ env.DRY_RUN }}"
+
+  installed:
+    name: install published npm facade
+    needs: [build, facade]
+    if: ${{ !inputs.dry-run }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, macos-latest, windows-latest] }
+    defaults:
+      run: { shell: bash }
+    permissions: { contents: read, packages: read }
+    env:
+      NODE_AUTH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: { ref: "refs/tags/${{ env.RELEASE_TAG }}", persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
+      - name: Install from GitHub Packages and exercise the CLI
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          package="$(jq -r .facade distribution/npm/targets.json)"
+          smoke="$(mktemp -d)"
+          trap 'rm -rf -- "${smoke}"' EXIT
+          npm install --prefix "${smoke}" --no-save --no-audit --no-fund --include=optional "${package}@${version}"
+          cli="${smoke}/node_modules/.bin/actionlint"
+          got="$("${cli}" -version | head -1)"
+          case "${got}" in
+          *"${version}") ;;
+          *) echo "::error::installed CLI reported '${got}', expected ${version}"; exit 1 ;;
+          esac
+          (cd "${smoke}" && node -e 'require(process.argv[1] + "/schema")' "${package}")
+          cmp actionlint.schema.json "${smoke}/node_modules/${package}/actionlint.schema.json"
+          bash scripts/check-packaged-cli.bash "${cli}"
+          echo "Installed and exercised ${package}@${version} from ${REGISTRY}" >> "${GITHUB_STEP_SUMMARY}"

@@ -59,7 +59,7 @@ export async function nativeBinary(version: string, platform: RunnerPlatform, di
 	const binary = platform.os === 'windows' ? 'actionlint.exe' : 'actionlint';
 	console.log(`Downloading actionlint ${version} (${platform.os}/${platform.arch})`);
 	const name = nativeAssetName(version, platform);
-	const base = `https://github.com/kjanat/actionlint/releases/download/v${version}`;
+	const base = `https://github.com/kajaux/actionlint/releases/download/v${version}`;
 	const checksums = await download(
 		`${base}/actionlint_${version}_checksums.txt`,
 		join(directory, 'checksums.txt'),

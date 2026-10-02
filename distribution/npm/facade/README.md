@@ -1,21 +1,30 @@
-# @kjanat/actionlint
+# @kajaux/actionlint
 
 Static checker for GitHub Actions workflow files, distributed as a prebuilt binary.
 
-This is the npm distribution of [`kjanat/actionlint`](https://github.com/kjanat/actionlint), a fork of
-[rhysd/actionlint](https://github.com/rhysd/actionlint). Installing it puts an `actionlint` executable on your `PATH`; no
-Go toolchain is needed.
+This GitHub Packages build comes from [`kajaux/actionlint`](https://github.com/kajaux/actionlint),
+the isolated release-test repository for [`kjanat/actionlint`](https://github.com/kjanat/actionlint).
+Installing it puts an `actionlint` executable on your `PATH`; no Go toolchain is needed.
 
 ## Install
 
+Authenticate to GitHub Packages with a token that can read these packages:
+
 ```sh
-npm install --save-dev @kjanat/actionlint
+npm config set @kajaux:registry https://npm.pkg.github.com
+npm login --scope=@kajaux --auth-type=legacy --registry=https://npm.pkg.github.com
+```
+
+Then install:
+
+```sh
+npm install --save-dev @kajaux/actionlint
 ```
 
 Or run it without adding it to the project:
 
 ```sh
-npx @kjanat/actionlint
+npx @kajaux/actionlint
 ```
 
 ## Usage
@@ -46,7 +55,7 @@ The manual page ships in the package as `man/actionlint.1`. npm registered man p
 v11; from v12 it no longer does, so on a current npm read it directly:
 
 ```sh
-man ./node_modules/@kjanat/actionlint/man/actionlint.1
+man ./node_modules/@kajaux/actionlint/man/actionlint.1
 ```
 
 ### Configuration schema
@@ -55,46 +64,12 @@ The package includes `actionlint.schema.json` for completion and validation in c
 `.github/actionlint.yaml`, use the installed copy with:
 
 ```yaml
-# yaml-language-server: $schema=../node_modules/@kjanat/actionlint/actionlint.schema.json
+# yaml-language-server: $schema=../node_modules/@kajaux/actionlint/actionlint.schema.json
 ```
 
 ShellCheck directives reference `schemas/shellcheck/0.11.0.schema.json` relative
 to the main schema. The package includes that file, so local schema validation
-can run offline. A versioned CDN URL uses the schema from the same npm release.
-
-<details>
-<summary>CDN URLs for the JSON schema</summary>
-
-These URLs require an npm release containing the schema:
-
-jsDelivr:
-
-```text
-https://cdn.jsdelivr.net/npm/@kjanat/actionlint/actionlint.schema.json
-```
-
-esm.sh:
-
-```text
-https://esm.sh/@kjanat/actionlint/actionlint.schema.json
-```
-
-UNPKG:
-
-```text
-https://unpkg.com/@kjanat/actionlint/actionlint.schema.json
-```
-
-For example, use jsDelivr in an editor's schema directive:
-
-```yaml
-# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@kjanat/actionlint/actionlint.schema.json
-```
-
-Unversioned URLs follow the latest npm release. Insert `@<version>` after `@kjanat/actionlint` to select the schema for
-a specific release that includes it.
-
-</details>
+can run offline. Use the installed schema: this test package is published to GitHub Packages, not npmjs CDNs.
 
 ### ShellCheck and Pyflakes
 
@@ -105,21 +80,21 @@ checks.
 ## How this package is put together
 
 This package contains no binary itself. It declares one `optionalDependencies` entry per platform, each published
-under the `@kjanat-actionlint` scope so the binaries stay out of the `@kjanat` namespace:
+under the same `@kajaux` scope:
 
-| Package                                      | Runs on               |
-| -------------------------------------------- | --------------------- |
-| `@kjanat-actionlint/actionlint-darwin-arm64` | macOS Apple silicon   |
-| `@kjanat-actionlint/actionlint-darwin-x64`   | macOS Intel           |
-| `@kjanat-actionlint/actionlint-freebsd-ia32` | FreeBSD 32-bit x86    |
-| `@kjanat-actionlint/actionlint-freebsd-x64`  | FreeBSD x86-64        |
-| `@kjanat-actionlint/actionlint-linux-arm64`  | Linux ARM64           |
-| `@kjanat-actionlint/actionlint-linux-arm`    | Linux ARMv6 and ARMv7 |
-| `@kjanat-actionlint/actionlint-linux-ia32`   | Linux 32-bit x86      |
-| `@kjanat-actionlint/actionlint-linux-x64`    | Linux x86-64          |
-| `@kjanat-actionlint/actionlint-win32-arm64`  | Windows ARM64         |
-| `@kjanat-actionlint/actionlint-win32-ia32`   | Windows 32-bit x86    |
-| `@kjanat-actionlint/actionlint-win32-x64`    | Windows x86-64        |
+| Package                           | Runs on               |
+| --------------------------------- | --------------------- |
+| `@kajaux/actionlint-darwin-arm64` | macOS Apple silicon   |
+| `@kajaux/actionlint-darwin-x64`   | macOS Intel           |
+| `@kajaux/actionlint-freebsd-ia32` | FreeBSD 32-bit x86    |
+| `@kajaux/actionlint-freebsd-x64`  | FreeBSD x86-64        |
+| `@kajaux/actionlint-linux-arm64`  | Linux ARM64           |
+| `@kajaux/actionlint-linux-arm`    | Linux ARMv6 and ARMv7 |
+| `@kajaux/actionlint-linux-ia32`   | Linux 32-bit x86      |
+| `@kajaux/actionlint-linux-x64`    | Linux x86-64          |
+| `@kajaux/actionlint-win32-arm64`  | Windows ARM64         |
+| `@kajaux/actionlint-win32-ia32`   | Windows 32-bit x86    |
+| `@kajaux/actionlint-win32-x64`    | Windows x86-64        |
 
 Each declares `os` and `cpu`, so your package manager downloads only the one matching your machine and skips the rest.
 The `actionlint` command here is a small launcher that resolves that package and execs the binary inside it.
@@ -135,8 +110,8 @@ release's published checksums before being repackaged.
 The launcher fails with an explanation, but the usual cause is a package manager that skipped optional dependencies.
 Reinstall without `--no-optional` or `--omit=optional`.
 
-Using Bun with `minimumReleaseAge`? Add `@kjanat-actionlint/*` to `minimumReleaseAgeExcludes` alongside
-`@kjanat/actionlint`. A fresh release otherwise installs the facade while its binaries are still age-gated.
+Using Bun with `minimumReleaseAge`? Add `@kajaux/*` to `minimumReleaseAgeExcludes` alongside
+`@kajaux/actionlint`. A fresh release otherwise installs the facade while its binaries are still age-gated.
 
 ## Analysis results
 
@@ -144,11 +119,11 @@ CLI `check --json` and the GitHub Action emit the same versioned result contract
 This package ships the schema and types supported by its matching binary:
 
 ```typescript
-import type { CheckResult, DiagnosticRecord } from '@kjanat/actionlint/result';
+import type { CheckResult, DiagnosticRecord } from '@kajaux/actionlint/result';
 ```
 
-`@kjanat/actionlint/result.schema.json` exports the result schema;
-`@kjanat/actionlint/schemas/results/v1.schema.json` selects its contract version.
+`@kajaux/actionlint/result.schema.json` exports the result schema;
+`@kajaux/actionlint/schemas/results/v1.schema.json` selects its contract version.
 `CheckResult` describes a complete result, including failed analysis;
 `DiagnosticRecord` describes one JSONL record. Types do not validate untrusted JSON.
 See [the result contract](https://github.com/kjanat/actionlint/blob/master/docs/results.md)
@@ -164,5 +139,5 @@ Homebrew, Arch (AUR), Scoop, Docker, a download script, and `go install` are all
 MIT. See [LICENSE.txt](./LICENSE.txt).
 
 [pyflakes]: https://pypi.org/project/pyflakes/
-[releases]: https://github.com/kjanat/actionlint/releases
+[releases]: https://github.com/kajaux/actionlint/releases
 [shellcheck]: https://www.shellcheck.net/
