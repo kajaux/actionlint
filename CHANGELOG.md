@@ -2,6 +2,8 @@
 
 # Unreleased
 
+- Select an exact Action binary with `version` or `version-file`, including `.tool-versions`; use `install-only` to put it and enabled optional tools on PATH without running analysis. (kjanat/actionlint#185)
+
 - Replace the Docker-only Action with a Node 24 launcher for the ordinary binary. Keep shipped inputs and output formats; add one inline configuration overlay, compact summaries, optional SARIF and PR reviews, and a versioned `result-file`. Normal release tags contain root `action.mjs`; retain the legacy Docker Action image tags. (kjanat/actionlint#185)
 - Add shared ShellCheck configuration with inline directives, rc selection and source resolution. Preserve inline directives when rc loading is disabled, resolve overlay paths from the analysis directory, and warn about ignored legacy config keys. (kjanat/actionlint#182)
 

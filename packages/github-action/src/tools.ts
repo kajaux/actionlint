@@ -197,6 +197,11 @@ export async function inspectTools(executable: string, environment: Environment)
 	const result = await capture(executable, ['-github-action-tools'], environment, { timeoutMS: 300_000 });
 	if (result.exitCode !== 0) {
 		const message = result.stderr.trim() || `actionlint configuration inspection exited with ${result.exitCode}`;
+		if (/(?:unknown flag:|flag provided but not defined:)\s*-*github-action-tools\b/.test(message)) {
+			throw new InputError(
+				"This actionlint release does not support the native Action protocol. Use 'install-only: true' and run actionlint in a later step, or select a release containing the Node Action.",
+			);
+		}
 		throw result.exitCode === 2 ? new InputError(message) : new Error(message);
 	}
 	const plan: unknown = JSON.parse(result.stdout);

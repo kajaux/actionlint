@@ -39,6 +39,39 @@ function fixture(exitCode = 0) {
 	return { calls, executions, publications, runtime };
 }
 
+test('install-only publishes tools without inspecting or executing the selected binary', async () => {
+	const setup = fixture();
+	setup.runtime.inspect = async () => assert.fail('setup must not inspect workflows or require the Action protocol');
+	setup.runtime.execute = async () => assert.fail('setup must not analyze');
+	assert.equal(await runAction({ 'INPUT_INSTALL-ONLY': 'true', INPUT_CONFIG: 'not linted' }, setup.runtime), 0);
+	assert.deepEqual(setup.calls, ['native', 'shellcheck', 'pyflakes']);
+	assert.deepEqual(Object.keys(setup.publications[0] ?? {}).sort(), ['actionlint', 'pyflakes', 'shellcheck']);
+});
+
+test('install-only respects optional-tool selection and validates setup inputs before downloading', async () => {
+	const setup = fixture();
+	assert.equal(
+		await runAction(
+			{ 'INPUT_INSTALL-ONLY': 'true', INPUT_SHELLCHECK: 'false', INPUT_PYFLAKES: 'false' },
+			setup.runtime,
+		),
+		0,
+	);
+	assert.deepEqual(setup.calls, ['native']);
+	assert.deepEqual(setup.executions, []);
+	for (
+		const environment of [
+			{ 'INPUT_INSTALL-ONLY': 'yes' },
+			{ 'INPUT_INSTALL-ONLY': 'true', INPUT_SHELLCHECK: 'yes' },
+			{ 'INPUT_INSTALL-ONLY': 'true', 'INPUT_ADD-ACTIONLINT-TO-PATH': 'false' },
+		]
+	) {
+		const invalid = fixture();
+		await assert.rejects(runAction(environment, invalid.runtime), InputError);
+		assert.deepEqual(invalid.calls, []);
+	}
+});
+
 test('ordinary binary receives explicit action mode, untouched inputs, and its exit code is preserved', async () => {
 	const setup = fixture(1);
 	const environment = {

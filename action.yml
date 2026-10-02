@@ -5,6 +5,18 @@ description: >-
   Static-check GitHub Actions workflow files with actionlint,
   ShellCheck, and pyflakes.
 inputs:
+  version:
+    description: Exact actionlint release version, optionally prefixed with v. Defaults to this Action's version; overrides version-file.
+    required: false
+    default: ""
+  version-file:
+    description: File containing an exact version or a .tool-versions actionlint entry, relative to working-directory.
+    required: false
+    default: ""
+  install-only:
+    description: Install actionlint and enabled optional tools on PATH without analyzing workflows. Requires add-actionlint-to-path.
+    required: false
+    default: "false"
   files:
     description: >-
       Newline-separated workflow file paths.
@@ -103,6 +115,8 @@ inputs:
     required: false
     default: ${{ github.token }}
 outputs:
+  version:
+    description: Installed actionlint release version, without the v prefix.
   exit-code:
     description: >-
       actionlint exit code:
