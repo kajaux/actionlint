@@ -561,7 +561,7 @@ jobs:
         with: { persist-credentials: false }
       - name: Download actionlint
         id: get_actionlint
-        run: bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
+        run: bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.2
         shell: bash
       - name: Check workflow files
         env: { actionlint: "${{ steps.get_actionlint.outputs.executable }}" }
@@ -574,7 +574,7 @@ Or simply download the executable and run it in one step:
 ```yaml
 - name: Check workflow files
   run: |
-    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
+    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.2
     ./actionlint -color
   shell: bash
 ```
@@ -636,7 +636,7 @@ Available tags are:
   Moving alias for the latest stable version of actionlint. This image is recommended.
 - `ghcr.io/kjanat/actionlint:{version}`:\
   Release-specific actionlint image rather than a moving alias.\
-  (e.g. `ghcr.io/kjanat/actionlint:1.17.0`)
+  (e.g. `ghcr.io/kjanat/actionlint:1.18.2`)
 
 The CLI image is also published to Docker Hub as `kjanat/actionlint:latest` and
 `kjanat/actionlint:{version}`. Both registries carry the same manifest, so pick
@@ -756,7 +756,7 @@ in the step of your workflow.
 - name: Check workflow files
   run: |
     echo "::add-matcher::.github/actionlint-matcher.json"
-    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
+    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.2
     ./actionlint -color
   shell: bash
 ```
@@ -801,7 +801,7 @@ Add this to your `.pre-commit-config.yaml` in your repository:
 ---
 repos:
   - repo: https://github.com/kjanat/actionlint
-    rev: v1.17.0
+    rev: v1.18.2
     hooks:
       - id: actionlint
 ```
@@ -829,7 +829,7 @@ plain hook:
 ---
 repos:
   - repo: https://github.com/kjanat/actionlint
-    rev: v1.17.0
+    rev: v1.18.2
     hooks:
       - id: actionlint
         additional_dependencies:
@@ -924,7 +924,7 @@ trunk check enable actionlint
 or if you'd like a specific version:
 
 ```bash
-trunk check enable actionlint@1.17.0
+trunk check enable actionlint@1.18.2
 ```
 
 or modify `.trunk/trunk.yaml` in your repository to contain:
@@ -932,7 +932,7 @@ or modify `.trunk/trunk.yaml` in your repository to contain:
 ```yaml
 lint:
   enabled:
-    - actionlint@1.17.0
+    - actionlint@1.18.2
 ```
 
 Then just run:

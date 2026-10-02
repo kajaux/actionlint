@@ -181,7 +181,7 @@ Workflow files can be checked on every commit with [pre-commit][pre-commit]. Add
 ---
 repos:
   - repo: https://github.com/kjanat/actionlint
-    rev: v1.17.0
+    rev: v1.18.2
     hooks: [id: actionlint]
 ```
 
@@ -264,11 +264,11 @@ actionlint is distributed under [the MIT license].
 
 <!-- versioned links -->
 
-[api]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/api.md
-[checks]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/checks.md
+[api]: https://github.com/kjanat/actionlint/blob/v1.18.2/docs/api.md
+[checks]: https://github.com/kjanat/actionlint/blob/v1.18.2/docs/checks.md
 [install]: https://github.com/kjanat/actionlint/blob/master/docs/install.md
-[refs]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/reference.md
-[usage]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/usage.md
+[refs]: https://github.com/kjanat/actionlint/blob/v1.18.2/docs/reference.md
+[usage]: https://github.com/kjanat/actionlint/blob/v1.18.2/docs/usage.md
 
 <!-- specific commit refs -->
 
