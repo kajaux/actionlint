@@ -233,6 +233,52 @@ jobs:
         run: |
           env -u ACTIONLINT_VERSION node --run build -- --out-dir "${RUNNER_TEMP}/actionlint-action-fallback"
           cmp "${RUNNER_TEMP}/actionlint-action-fallback/action.mjs" "${RUNNER_TEMP}/actionlint-action/action/action.mjs"
+      - name: Install an explicit historical version
+        id: setup-version
+        uses: ./.actionlint-action-test
+        env: { ACTIONLINT_ACTION_BINARY: "" }
+        with:
+          version: v1.17.0
+          version-file: missing-actionlint-version
+          install-only: true
+          shellcheck: false
+          pyflakes: false
+      - name: Check the installed version and prepare a version file
+        run: |
+          actionlint --version | grep -Fx 'actionlint.kjanat.dev 1.17.0'
+          printf 'nodejs 24.0.0\nactionlint 1.17.0\n' > .actionlint-action-test/.tool-versions
+      - name: Install from a tool version file
+        id: setup-version-file
+        uses: ./.actionlint-action-test
+        env: { ACTIONLINT_ACTION_BINARY: "" }
+        with:
+          working-directory: .actionlint-action-test
+          version-file: .tool-versions
+          install-only: true
+          shellcheck: false
+          pyflakes: false
+      - name: Check setup outputs and the surviving binary
+        env:
+          VERSION_OUTPUTS: ${{ toJSON(steps.setup-version.outputs) }}
+          VERSION_FILE_OUTPUTS: ${{ toJSON(steps.setup-version-file.outputs) }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readdirSync } from 'node:fs';
+          for (const value of [process.env.VERSION_OUTPUTS, process.env.VERSION_FILE_OUTPUTS]) {
+            const outputs = JSON.parse(value);
+            assert.equal(outputs.version, '1.17.0');
+            assert.equal(outputs['exit-code'], '0');
+            assert.equal(outputs.result, 'success');
+            assert.equal(outputs['problem-count'], '');
+            assert.equal(outputs['result-file'], '');
+          }
+          assert.ok(!readdirSync(process.env.RUNNER_TEMP).some(name => name.startsWith('actionlint-result-')));
+          NODE
+          actionlint_path="$(command -v actionlint)"
+          [[ "${actionlint_path}" == */actionlint-bin-*/actionlint* ]]
+          actionlint --version | grep -Fx 'actionlint.kjanat.dev 1.17.0'
+          rm .actionlint-action-test/.tool-versions
       - name: Exercise the action through the real runner
         id: smoke
         # ./ loads the candidate release tree generated in this job's workspace.

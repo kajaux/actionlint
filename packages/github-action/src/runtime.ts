@@ -40,8 +40,15 @@ export function toolEnabled(value: string | undefined): boolean | undefined {
 	return undefined;
 }
 
+export function installOnly(environment: Environment): boolean {
+	const value = toolEnabled(environment['INPUT_INSTALL-ONLY'] || 'false');
+	if (value === undefined) throw new InputError("Input 'install-only' must be 'true' or 'false'");
+	return value;
+}
+
 export async function runAction(environment: Environment, runtime: Runtime): Promise<number> {
 	environment = normalizeEnvironment(environment);
+	const setupOnly = installOnly(environment);
 	const exportInput = (name: string): boolean => {
 		const value = toolEnabled(environment[`INPUT_${name.toUpperCase()}`]);
 		if (value === undefined) throw new InputError(`Input '${name}' must be 'true' or 'false'`);
@@ -50,6 +57,14 @@ export async function runAction(environment: Environment, runtime: Runtime): Pro
 	const addActionlint = exportInput('add-actionlint-to-path');
 	const addShellcheck = exportInput('add-shellcheck-to-path');
 	const addPyflakes = exportInput('add-pyflakes-to-path');
+	if (setupOnly && !addActionlint) {
+		throw new InputError("Input 'install-only: true' requires 'add-actionlint-to-path: true'");
+	}
+	const shellcheck = toolEnabled(environment.INPUT_SHELLCHECK);
+	const pyflakes = toolEnabled(environment.INPUT_PYFLAKES);
+	if (setupOnly && (shellcheck === undefined || pyflakes === undefined)) {
+		throw new InputError("Inputs 'shellcheck' and 'pyflakes' must be 'true' or 'false'");
+	}
 	const override = environment.ACTIONLINT_ACTION_BINARY;
 	let executable: string;
 	if (override) {
@@ -67,10 +82,8 @@ export async function runAction(environment: Environment, runtime: Runtime): Pro
 	delete childEnvironment.ACTIONLINT_PYFLAKES_COMMAND;
 	delete childEnvironment.ACTIONLINT_PYTHON;
 	delete childEnvironment.ACTIONLINT_PYFLAKES_SCRIPT;
-	const shellcheck = toolEnabled(environment.INPUT_SHELLCHECK);
-	const pyflakes = toolEnabled(environment.INPUT_PYFLAKES);
 	if (shellcheck !== undefined && pyflakes !== undefined) {
-		const needed = await runtime.inspect(executable, childEnvironment);
+		const needed = setupOnly ? { shellcheck, pyflakes } : await runtime.inspect(executable, childEnvironment);
 		if (shellcheck && needed.shellcheck) {
 			const command = await runtime.shellcheck();
 			if (addShellcheck) tools.shellcheck = command;
@@ -88,5 +101,6 @@ export async function runAction(environment: Environment, runtime: Runtime): Pro
 		}
 		if (Object.keys(tools).length > 0) await runtime.publish(tools);
 	}
+	if (setupOnly) return 0;
 	return runtime.execute(executable, ['-github-action'], childEnvironment);
 }

@@ -23,6 +23,46 @@ This discovers workflows, reports findings as annotations, and writes a compact
 job summary. Findings fail the step. Pin a **published release commit SHA** or
 normal `vX.Y.Z` tag for immutable consumption; major/minor tags move.
 
+## Install without running analysis
+
+```yaml
+- uses: kjanat/actionlint@v1
+  id: setup
+  with:
+    install-only: true
+    version: 1.17.0
+    shellcheck: false
+    pyflakes: false
+- run: actionlint --version
+- run: actionlint .github/workflows/ci.yml
+```
+
+`install-only` exports the selected binary for later steps without reading workflows
+or lint configuration. Enabled ShellCheck/Pyflakes integrations are also installed;
+disable them as above to install just actionlint. Keep `add-actionlint-to-path: true`
+(the default). Analysis and reporting inputs do not apply in this mode.
+
+Use `version-file: .tool-versions` instead of `version` to read a checked-in pin:
+
+```text
+nodejs 24.21.0
+actionlint 1.17.0
+```
+
+An ordinary file containing only `1.17.0` is also supported. Paths resolve from
+`working-directory`; `.tool-versions` comments and other tools are ignored. The
+actionlint entry must select one exact release. Ranges, `system`, and source/path
+selectors are not supported. An explicit `version` takes precedence without reading
+`version-file`. With neither input, the binary matches the Action release. An optional
+`v` prefix is accepted; the `version` output contains the selected version without it.
+
+Install-only works with older releases. Automatic linting requires a binary with
+the native Action protocol introduced by the Node Action; older binaries can be
+installed and invoked directly as shown above.
+
+After setup, `result` is `success` and `exit-code` is `0`. No analysis occurred:
+`problem-count`, `output`, `output-file`, `result-file`, and `report-sarif` are empty.
+
 ## Configuration
 
 Keep reusable settings in `.github/actionlint.yaml`, shared with the CLI:
@@ -33,7 +73,7 @@ self-hosted-runner:
 tools:
   shellcheck:
     config:
-      enable: [check-unassigned-uppercase]
+      enable: [quote-safe-variables]
 ```
 
 The quick-start workflow needs no changes. `.yaml` wins over `.yml` if both
@@ -199,7 +239,7 @@ write permission. Review failure is advisory and leaves the analysis outcome int
 
 ## Tools and advanced ShellCheck
 
-Each invocation downloads the **version-matched ordinary binary**, verifies its
+Each invocation downloads the **selected ordinary binary**, verifies its
 checksum and executes it. It does not reuse a cached actionlint binary. ShellCheck
 and Pyflakes use a suitable PATH installation, then the tool cache, then a pinned
 download. Pyflakes needs Python 3.9 or newer; the Action does not install Python.
@@ -240,6 +280,9 @@ All inputs are optional. Booleans accept `true`/`false`.
 
 | Input                                                                      | Default        | Meaning                                                                    |
 | -------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------- |
+| `version`                                                                  | Action release | Exact binary release; overrides `version-file`.                            |
+| `version-file`                                                             | empty          | Exact version file or `.tool-versions`, relative to `working-directory`.   |
+| `install-only`                                                             | `false`        | Install tools on PATH without analysis or reporting.                       |
 | `files`                                                                    | discover       | Literal newline-separated workflow paths.                                  |
 | `format`                                                                   | `github`       | `github`, `default`, `oneline`, `json`, `json-lines`, `markdown`, `sarif`. |
 | `ignore`                                                                   | empty          | Newline-separated regular expressions.                                     |
@@ -258,21 +301,28 @@ All inputs are optional. Booleans accept `true`/`false`.
 | `review`                                                                   | `false`        | Advisory PR review posting.                                                |
 | `token`                                                                    | `github.token` | Used only by the review reporter.                                          |
 
-| Output           | Meaning                                                                             |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `exit-code`      | Analysis status: 0 clean, 1 findings, 2 invalid input, 3 incomplete/failure.        |
-| `result`         | `success`, `problems-found`, `invalid-options`, `failure`.                          |
-| `problems-found` | Whether analysis completed with findings. Partial findings remain in `result-file`. |
-| `problem-count`  | Count, or empty when analysis did not complete.                                     |
-| `output`         | Complete legacy-format output; prefer files for large reports.                      |
-| `output-file`    | Workspace-relative requested path, or empty.                                        |
-| `result-file`    | Absolute versioned JSON path, including failure results when writable.              |
-| `report-sarif`   | Absolute SARIF path, or empty when not requested/not completed.                     |
+| Output           | Meaning                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `version`        | Installed binary version, without the `v` prefix.                                                                       |
+| `exit-code`      | Exit status: 0 successful setup/clean analysis, 1 findings, 2 invalid input, 3 failure.                                 |
+| `result`         | `success`, `problems-found`, `invalid-options`, `failure`.                                                              |
+| `problems-found` | Whether analysis completed with findings. Partial findings remain in `result-file`.                                     |
+| `problem-count`  | Count, or empty when analysis did not complete.                                                                         |
+| `output`         | Selected serialization; JSON uses the same result as `result-file`, including failures. Prefer files for large reports. |
+| `output-file`    | Workspace-relative requested path, or empty.                                                                            |
+| `result-file`    | Absolute versioned JSON path, including failure results when writable.                                                  |
+| `report-sarif`   | Absolute SARIF path, or empty when not requested/not completed.                                                         |
 
 ## Migration and troubleshooting
 
-The nine shipped inputs and six shipped outputs retain their contracts. New
-defaults add a compact summary and independent PATH exports; turn each off when
+Input and output names remain available, but **JSON and JSON Lines change shape**:
+JSON now returns the versioned result object instead of a diagnostic array; JSON
+Lines uses versioned canonical diagnostics. Update consumers using the
+[migration guide](results.md) before upgrading. The unified contract is
+the default; there is no separate legacy JSON mode. Coordinate affected consumers
+before promoting moving Action tags.
+
+New defaults add a compact summary and independent PATH exports; turn each off when
 unwanted. JavaScript removes Docker's Linux/daemon requirement. Existing immutable
 Docker releases and digest pins remain untouched. Compatibility images continue
 as `action-X.Y.Z`, `action-vX.Y`, `action-vX`, and `action-latest`, using a thin
