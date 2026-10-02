@@ -1,0 +1,559 @@
+diff --git a/.github/actions/npm-publish/action.yml b/.github/actions/npm-publish/action.yml
+index e8c7777b6e47076733a01b8d0012dd684b7524ea..bf38a6ce595e9ffc78973e7c6b9af570c4f74996 100644
+--- a/.github/actions/npm-publish/action.yml
++++ b/.github/actions/npm-publish/action.yml
+@@ -1,5 +1,5 @@
+ name: Publish an npm tarball
+-description: Publish one packed tarball through npm trusted publishing and report where it landed
++description: Publish one tested tarball to the isolated rehearsal's GitHub Packages registry
+ inputs:
+   tarball:
+     description: Path to the .tgz to publish
+@@ -50,7 +50,17 @@ runs:
+         name="$(jq -er .name <<<"${manifest}")"
+         version="$(jq -er .version <<<"${manifest}")"
+ 
+-        args=(--access public --tag "${DIST_TAG}")
++        # Fork-only boundary: neither production names nor npmjs can be written.
++        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint-release-rehearsal' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
++          echo '::error::Publishing is restricted to the isolated rehearsal repository and GitHub Packages.'
++          exit 1
++        fi
++        case "${name}" in
++        @kajaux/actionlint-rehearsal | @kajaux/actionlint-*) ;;
++        *) echo "::error::Unexpected rehearsal package ${name}"; exit 1 ;;
++        esac
++        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint-release-rehearsal.git"' <<<"${manifest}"
++        args=(--registry "${REGISTRY}" --tag "${DIST_TAG}")
+         if [[ "${DRY_RUN}" == 'true' ]]; then
+           # Allow testing existing releases; --dry-run still prevents uploads.
+           args+=(--dry-run --force)
+@@ -60,5 +70,5 @@ runs:
+         {
+           echo "name=${name}"
+           echo "version=${version}"
+-          echo "url=https://npm.im/package/${name}/v/${version}"
++          echo "url=https://github.com/kajaux/actionlint-release-rehearsal/packages"
+         } >> "${GITHUB_OUTPUT}"
+diff --git a/.github/workflows/npm-release.yml b/.github/workflows/npm-release.yml
+index 50de9decdcd472ae3905acd94ded48b4893f0e81..df63d5a0378ea336ffe811d9de60abe29258d991 100644
+--- a/.github/workflows/npm-release.yml
++++ b/.github/workflows/npm-release.yml
+@@ -28,7 +28,7 @@ concurrency:
+ 
+ env:
+   GO: "1.27"
+-  REGISTRY: https://registry.npmjs.org/
++  REGISTRY: https://npm.pkg.github.com/
+   RELEASE_TAG: ${{ inputs.tag }}
+   DRY_RUN: ${{ inputs.dry-run || 'false' }}
+ 
+@@ -42,6 +42,8 @@ jobs:
+       platforms: ${{ steps.pack.outputs.platforms }}
+       node: ${{ steps.node.outputs.version }}
+     steps:
++      - name: Require the isolated rehearsal repository
++        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint-release-rehearsal'
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+         with: { ref: "${{ case(inputs.dry-run, github.sha, format('refs/tags/{0}', env.RELEASE_TAG)) }}", persist-credentials: false }
+       # Manual recovery requires verified release bytes even if a later publishing job failed.
+@@ -79,7 +81,7 @@ jobs:
+           - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+             with: { go-version: "${{ env.GO }}", check-latest: true }
+           - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+-            with: { node-version-file: .node-version, registry-url: "${{ env.REGISTRY }}" }
++            with: { node-version-file: .node-version, registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
+ 
+       # The publish jobs check out nothing, so .node-version cannot reach them.
+       # Passing the version this job resolved keeps one source of truth.
+@@ -165,7 +167,7 @@ jobs:
+             unpack "distribution/npm/tarballs/${pkg}.tgz" "${scope}/actionlint-${pkg}"
+           done
+           cmp actionlint.schema.json "${facade}/actionlint.schema.json"
+-          (cd "${smoke}" && node -e 'require("@kjanat/actionlint/schema")')
++          (cd "${smoke}" && node -e 'require(process.argv[1] + "/schema")' "$(jq -r .facade "${GITHUB_WORKSPACE}/distribution/npm/targets.json")")
+           got="$(node "${facade}/bin/actionlint.mjs" -version | head -1)"
+           echo "launcher reported: ${got}"
+           case "${got}" in
+@@ -186,27 +188,27 @@ jobs:
+       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+         with: { name: npm-tarballs, path: distribution/npm/tarballs, retention-days: 7 }
+ 
+-  # Leaves first: the facade pins them exactly. One job per package, each with
+-  # its own deployment, from the environment named in its npm trusted publisher.
++  # Leaves first: the facade pins them exactly. Publish the tested tarballs
++  # into the isolated repository's GitHub Packages namespace.
+   platforms:
+     name: publish ${{ matrix.pkg }}
+     needs: build
+     runs-on: ubuntu-latest
+-    permissions: { contents: read, id-token: write }
++    permissions: { contents: read, packages: write }
+     environment:
+       name: npm-actionlint
+       url: ${{ steps.publish.outputs.url }}
+     env:
+-      # Set per job: an environment's variables only resolve inside the job
+-      # deploying to it. PROVENANCE=false opts out; a dry run forces it off.
+-      NPM_CONFIG_PROVENANCE: ${{ (inputs.dry-run && 'false') || vars.PROVENANCE || 'true' }}
++      # GitHub Packages uses GITHUB_TOKEN; npmjs trusted publishing is not exercised.
++      NPM_CONFIG_PROVENANCE: "false"
++      NODE_AUTH_TOKEN: ${{ github.token }}
+     strategy:
+       fail-fast: false
+       matrix:
+         pkg: ${{ fromJSON(needs.build.outputs.platforms) }}
+     steps:
+       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+-        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}" }
++        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
+       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         with: { name: npm-tarballs, path: tarballs }
+       - uses: $/.github/actions/npm-publish
+@@ -220,15 +222,16 @@ jobs:
+     name: publish the facade
+     needs: [build, platforms]
+     runs-on: ubuntu-latest
+-    permissions: { contents: read, id-token: write }
++    permissions: { contents: read, packages: write }
+     environment:
+       name: npm
+       url: ${{ steps.publish.outputs.url }}
+     env:
+-      NPM_CONFIG_PROVENANCE: ${{ (inputs.dry-run && 'false') || vars.PROVENANCE || 'true' }}
++      NPM_CONFIG_PROVENANCE: "false"
++      NODE_AUTH_TOKEN: ${{ github.token }}
+     steps:
+       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+-        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}" }
++        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
+       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         with: { name: npm-tarballs, path: tarballs }
+       - uses: $/.github/actions/npm-publish
+@@ -237,3 +240,41 @@ jobs:
+           tarball: tarballs/facade.tgz
+           dist-tag: "${{ needs.build.outputs.dist-tag }}"
+           dry-run: "${{ env.DRY_RUN }}"
++
++  installed:
++    name: install published npm facade
++    needs: [build, facade]
++    if: ${{ !inputs.dry-run }}
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 10
++    strategy:
++      fail-fast: false
++      matrix: { os: [ubuntu-latest, macos-latest, windows-latest] }
++    defaults:
++      run: { shell: bash }
++    permissions: { contents: read, packages: read }
++    env:
++      NODE_AUTH_TOKEN: ${{ github.token }}
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
++        with: { ref: "refs/tags/${{ env.RELEASE_TAG }}", persist-credentials: false }
++      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
++        with: { node-version: "${{ needs.build.outputs.node }}", registry-url: "${{ env.REGISTRY }}", scope: "@kajaux" }
++      - name: Install from GitHub Packages and exercise the CLI
++        run: |
++          set -euo pipefail
++          version="${RELEASE_TAG#v}"
++          package="$(jq -r .facade distribution/npm/targets.json)"
++          smoke="$(mktemp -d)"
++          trap 'rm -rf -- "${smoke}"' EXIT
++          npm install --prefix "${smoke}" --no-save --no-audit --no-fund --include=optional "${package}@${version}"
++          cli="${smoke}/node_modules/.bin/actionlint"
++          got="$("${cli}" -version | head -1)"
++          case "${got}" in
++          *"${version}") ;;
++          *) echo "::error::installed CLI reported '${got}', expected ${version}"; exit 1 ;;
++          esac
++          (cd "${smoke}" && node -e 'require(process.argv[1] + "/schema")' "${package}")
++          cmp actionlint.schema.json "${smoke}/node_modules/${package}/actionlint.schema.json"
++          bash scripts/check-packaged-cli.bash "${cli}"
++          echo "Installed and exercised ${package}@${version} from ${REGISTRY}" >> "${GITHUB_STEP_SUMMARY}"
+diff --git a/.github/workflows/release-prepare.yml b/.github/workflows/release-prepare.yml
+index f5d9898efa8ed0abe3ac197ad19cd0d06e734aeb..3263a57746db2e00e19b88706bd2456b52989681 100644
+--- a/.github/workflows/release-prepare.yml
++++ b/.github/workflows/release-prepare.yml
+@@ -85,10 +85,6 @@ jobs:
+           cp "${RUNNER_TEMP}/release-notes.md" "${RUNNER_TEMP}/actionlint-action/release-notes.md"
+       - uses: &Upload actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+         with: { name: prepared-release, path: "${{ runner.temp }}/actionlint-action", if-no-files-found: error }
+-  nix:
+-    needs: prepare
+-    uses: $/.github/workflows/nix.yml
+-    with: { tag: "v${{ inputs.version }}" }
+   action:
+     name: Candidate Action (${{ matrix.os }})
+     needs: prepare
+@@ -236,7 +232,7 @@ jobs:
+           compression-level: 0
+   draft:
+     name: Store the validated release draft
+-    needs: [prepare, nix, action, container]
++    needs: [prepare, action, container]
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+     permissions: { contents: write }
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 6288779bef7e2a2cbb70a11f203993fd8004a572..47cad02b074dc22ae534108babd1e59ec241e70c 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -105,53 +105,9 @@ jobs:
+   npm:
+     name: Publish npm packages
+     needs: verify
+-    permissions: { contents: read, actions: read, id-token: write }
++    permissions: { contents: read, actions: read, packages: write, id-token: write }
+     uses: $/.github/workflows/npm-release.yml
+     with: { tag: "${{ github.event.release.tag_name }}" }
+-  distributions:
+-    name: Publish prepared package manifests
+-    needs: verify
+-    if: needs.verify.outputs.is-latest == 'true'
+-    runs-on: ubuntu-latest
+-    timeout-minutes: 15
+-    environment: { name: aur }
+-    steps:
+-      - uses: *Checkout
+-        with: { persist-credentials: false }
+-      - uses: *SetupNode
+-        with: *Node24
+-      - uses: &Download actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+-        with: { name: verified-release, path: .release-assets }
+-      - name: Publish the prepared Homebrew and Scoop manifests
+-        env:
+-          VERSION: ${{ needs.verify.outputs.version }}
+-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+-          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+-        run: node scripts/release-assets.mjs publish .release-assets "${VERSION}"
+-      - name: Publish the prepared AUR binary package
+-        uses: &DeployAUR KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+-        with:
+-          pkgname: actionlint-kjanat-bin
+-          pkgbuild: .release-assets/actionlint-kjanat-bin.pkgbuild
+-          updpkgsums: false
+-          test: false
+-          post_process: cp "${GITHUB_WORKSPACE}/.release-assets/actionlint-kjanat-bin.srcinfo" .SRCINFO
+-          commit_username: ${{ vars.COMMIT_USER }}
+-          commit_email: ${{ vars.COMMIT_EMAIL }}
+-          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+-          commit_message: Update to ${{ github.event.release.tag_name }}
+-      - name: Publish the prepared AUR source package
+-        uses: *DeployAUR
+-        with:
+-          pkgname: actionlint-kjanat
+-          pkgbuild: .release-assets/actionlint-kjanat.pkgbuild
+-          updpkgsums: false
+-          test: false
+-          post_process: cp "${GITHUB_WORKSPACE}/.release-assets/actionlint-kjanat.srcinfo" .SRCINFO
+-          commit_username: ${{ vars.COMMIT_USER }}
+-          commit_email: ${{ vars.COMMIT_EMAIL }}
+-          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+-          commit_message: Update to ${{ github.event.release.tag_name }}
+   docker:
+     name: Publish tested container bytes
+     needs: verify
+@@ -161,14 +117,12 @@ jobs:
+     steps:
+       - uses: *Checkout
+         with: { persist-credentials: false }
+-      - uses: *Download
++      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         with: { name: verified-release, path: "${{ runner.temp }}/release-assets" }
+       - name: Install the OCI image copier
+         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends skopeo
+-      - uses: &DockerLogin docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
++      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+         with: { registry: ghcr.io, username: "${{ github.repository_owner }}", password: "${{ github.token }}" }
+-      - uses: *DockerLogin
+-        with: { username: "${{ github.repository_owner }}", password: "${{ secrets.DOCKERHUB_TOKEN }}" }
+       - name: Copy the exact tested multi-platform image
+         id: image
+         env:
+@@ -181,18 +135,15 @@ jobs:
+           if [[ "${MOVE_LATEST}" == true ]]; then tags+=(latest); fi
+           if [[ "${MOVE_MAJOR}" == true ]]; then tags+=("${VERSION%%.*}"); fi
+           if [[ "${MOVE_MINOR}" == true ]]; then tags+=("${VERSION%.*}"); fi
+-          for registry in ghcr.io docker.io; do
+-            for tag in "${tags[@]}"; do
+-              skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
+-                --digestfile "${RUNNER_TEMP}/${registry}.digest" \
+-                "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.tar" \
+-                "docker://${registry}/${GITHUB_REPOSITORY}:${tag}"
+-              expected="$(cat "${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.digest")"
+-              actual="$(cat "${RUNNER_TEMP}/${registry}.digest")"
+-              test "${actual}" = "${expected}"
+-            done
++          for tag in "${tags[@]}"; do
++            skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
++              --digestfile "${RUNNER_TEMP}/ghcr.io.digest" \
++              "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.tar" \
++              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
++            expected="$(cat "${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.digest")"
++            actual="$(cat "${RUNNER_TEMP}/ghcr.io.digest")"
++            test "${actual}" = "${expected}"
+           done
+-          cmp "${RUNNER_TEMP}/ghcr.io.digest" "${RUNNER_TEMP}/docker.io.digest"
+           digest="$(cat "${RUNNER_TEMP}/ghcr.io.digest")"
+           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+       - name: Publish the tested Docker Action compatibility image
+@@ -217,19 +168,8 @@ jobs:
+             test "${actual}" = "${expected}"
+           done
+           echo "digest=${expected}" >> "${GITHUB_OUTPUT}"
+-      - name: Update Docker Hub description
+-        if: needs.verify.outputs.is-latest == 'true'
+-        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+-        with:
+-          username: ${{ github.repository_owner }}
+-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+-          repository: ${{ github.repository }}
+-          short-description: ${{ github.event.repository.description }}
+-          enable-url-completion: true
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+         with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
+-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+-        with: { subject-name: "docker.io/${{ github.repository }}", subject-digest: "${{ steps.image.outputs.digest }}" }
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+         with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
+   action-smoke:
+@@ -259,10 +199,10 @@ jobs:
+         uses: ./.published-action-test
+   action-tags:
+     name: Update moving Action references
+-    needs: [verify, npm, distributions, docker, action-smoke]
++    needs: [verify, npm, docker, action-smoke]
+     if: >-
+       always() && needs.verify.result == 'success' && needs.npm.result == 'success' && needs.docker.result == 'success' &&
+-      needs.action-smoke.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.distributions.result)
++      needs.action-smoke.result == 'success'
+     runs-on: ubuntu-latest
+     timeout-minutes: 10
+     permissions: { contents: write }
+diff --git a/.goreleaser.yaml b/.goreleaser.yaml
+index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca06437cae 100644
+--- a/.goreleaser.yaml
++++ b/.goreleaser.yaml
+@@ -1,6 +1,7 @@
+ # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+ ---
+ version: 2
++project_name: actionlint
+ 
+ release:
+   draft: true
+@@ -80,8 +81,8 @@ homebrew_casks:
+       base_name: actionlint
+       shells: [bash, zsh, fish, pwsh]
+     url:
+-      template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+-      verified: github.com/kjanat/actionlint/
++      template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++      verified: github.com/kajaux/actionlint-release-rehearsal/
+     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
+     homepage: https://actionlint.kjanat.dev
+     description: Static checker for GitHub Actions workflow files
+@@ -109,7 +110,7 @@ scoops:
+     # that directory exists, leaving the root to the bucket's own config.
+     directory: bucket
+     goamd64: v1
+-    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+     homepage: https://actionlint.kjanat.dev
+     description: Static checker for GitHub Actions workflow files
+@@ -131,7 +132,7 @@ winget:
+     default_locale: en-US
+     publisher: kjanat
+     publisher_url: https://github.com/kjanat
+-    publisher_support_url: https://github.com/kjanat/actionlint/issues
++    publisher_support_url: https://github.com/kajaux/actionlint-release-rehearsal/issues
+     author: Kaj Kowalski
+     homepage: https://actionlint.kjanat.dev
+     short_description: Static checker for GitHub Actions workflow files
+@@ -140,18 +141,18 @@ winget:
+       placeholders, the shell scripts in run: steps, and many other mistakes that only surface once a workflow
+       runs. This is the kjanat fork.
+     license: MIT
+-    license_url: "https://github.com/kjanat/actionlint/blob/{{ .Tag }}/LICENSE.txt"
++    license_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
+     copyright: Copyright (c) 2026 Kaj Kowalski, Copyright (c) 2021 rhysd
+-    copyright_url: "https://github.com/kjanat/actionlint/blob/{{ .Tag }}/LICENSE.txt"
++    copyright_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
+     release_notes: "{{ .Changelog }}"
+-    release_notes_url: "https://github.com/kjanat/actionlint/releases/tag/{{ .Tag }}"
++    release_notes_url: "https://github.com/kajaux/actionlint-release-rehearsal/releases/tag/{{ .Tag }}"
+     installation_notes: >-
+       ShellCheck and pyflakes are optional; when installed, actionlint can use them
+       to check shell and Python scripts in workflow run steps.
+     tags: [actionlint, github-actions, workflow, linter, static-analysis, yaml, ci]
+     ids: [windows]
+     goamd64: v1
+-    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     commit_msg_template: "New version: {{ .PackageIdentifier }} {{ .Version }}"
+     # Resume uploads after microsoft/winget-pkgs#430563 is merged.
+     skip_upload: true
+@@ -184,7 +185,7 @@ aurs:
+     maintainers: ["Kaj Kowalski <info at kajkowalski dot nl>"]
+     license: MIT
+     rel: "1"
+-    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+     git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat-bin.git
+     commit_msg_template: "Update to {{ .Tag }}"
+@@ -223,7 +224,7 @@ aur_sources:
+     maintainers: ["Kaj Kowalski <info at kajkowalski dot nl>"]
+     license: MIT
+     rel: "1"
+-    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+     git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat.git
+     commit_msg_template: "Update to {{ .Tag }}"
+diff --git a/Dockerfile b/Dockerfile
+index c6b1325b197298809b31f1d5354a6c87ad0168c1..1e574135db82b1e2a93123a920adf3ec03dbfb5e 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -13,7 +13,7 @@ RUN go build -v -ldflags "-s -w -X actionlint.kjanat.dev.version=${ACTIONLINT_VE
+ FROM koalaman/shellcheck-alpine:stable AS shellcheck
+ 
+ FROM alpine:${ALPINE_VER} AS runtime
+-LABEL org.opencontainers.image.source="https://github.com/kjanat/actionlint"
++LABEL org.opencontainers.image.source="https://github.com/kajaux/actionlint-release-rehearsal"
+ LABEL org.opencontainers.image.licenses="MIT"
+ RUN apk add --no-cache python3 py3-pyflakes
+ COPY --from=builder /go/src/app/actionlint /usr/local/bin/
+diff --git a/REHEARSAL.md b/REHEARSAL.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..79e21f711802729df7192b494633c8446524ea37
+--- /dev/null
++++ b/REHEARSAL.md
+@@ -0,0 +1,12 @@
++# Isolated release rehearsal
++
++Source stack: `2cf1ae998a21b78e8471945ed2fd18be4903f1f0` (#204).
++Destination: `kajaux/actionlint-release-rehearsal` only.
++
++Exercise signed immutable GitHub releases, the published Action on Linux/macOS/Windows/ubuntu-slim,
++npm packages through GitHub Packages, and CLI/Action containers through GHCR.
++No npmjs, Docker Hub, Homebrew, Scoop, AUR, or WinGet publication. Nix checks excluded.
++
++The rehearsal uses version `1.17.0` in this fork's independent release namespace.
++It does not move any production tags or publish any production packages.
++GitHub Packages publication does not exercise npmjs trusted publishing.
+diff --git a/distribution/npm/facade/package.json b/distribution/npm/facade/package.json
+index 3c791a2a0fdd6988da40977eb096df25fbe997f5..41e292a8131833dabee591c70e14b3fc0e9e5e88 100644
+--- a/distribution/npm/facade/package.json
++++ b/distribution/npm/facade/package.json
+@@ -1,5 +1,5 @@
+ {
+-  "name": "@kjanat/actionlint",
++  "name": "@kajaux/actionlint-rehearsal",
+   "version": "0.0.0",
+   "description": "Static checker for GitHub Actions workflow files",
+   "keywords": [
+@@ -13,13 +13,13 @@
+     "yaml",
+     "shellcheck"
+   ],
+-  "homepage": "https://actionlint.kjanat.dev",
++  "homepage": "https://github.com/kajaux/actionlint-release-rehearsal",
+   "bugs": {
+-    "url": "https://github.com/kjanat/actionlint/issues"
++    "url": "https://github.com/kajaux/actionlint-release-rehearsal/issues"
+   },
+   "repository": {
+     "type": "git",
+-    "url": "git+https://github.com/kjanat/actionlint.git"
++    "url": "git+https://github.com/kajaux/actionlint-release-rehearsal.git"
+   },
+   "funding": {
+     "type": "github",
+diff --git a/distribution/npm/facade/test/resolve.test.mjs b/distribution/npm/facade/test/resolve.test.mjs
+index 3d1563cd2eee9f1d7ddb1d5453acbb563e8b8120..99752659d479a6d4614d6dcd722e962cc6d3e1d3 100644
+--- a/distribution/npm/facade/test/resolve.test.mjs
++++ b/distribution/npm/facade/test/resolve.test.mjs
+@@ -72,8 +72,8 @@ after(() => {
+ 
+ describe('platformPackage', () => {
+ 	test('follows the <scope>/<binary>-<os>-<cpu> convention', () => {
+-		assert.equal(platformPackage(SCOPE, BINARY, 'linux', 'x64'), '@kjanat-actionlint/actionlint-linux-x64');
+-		assert.equal(platformPackage(SCOPE, BINARY, 'win32', 'arm64'), '@kjanat-actionlint/actionlint-win32-arm64');
++		assert.equal(platformPackage(SCOPE, BINARY, 'linux', 'x64'), '@kajaux/actionlint-linux-x64');
++		assert.equal(platformPackage(SCOPE, BINARY, 'win32', 'arm64'), '@kajaux/actionlint-win32-arm64');
+ 	});
+ 
+ 	test('derives exactly the names targets.json declares', () => {
+@@ -90,7 +90,7 @@ describe('platformPackage', () => {
+ describe('resolveBinary', () => {
+ 	test('resolves the package matching the host', () => {
+ 		const path = resolveBinary('actionlint', context({ platform: 'linux', arch: 'x64' }));
+-		assert.equal(path, join('/fake/node_modules/@kjanat-actionlint/actionlint-linux-x64', 'bin', 'actionlint'));
++		assert.equal(path, join('/fake/node_modules/@kajaux/actionlint-linux-x64', 'bin', 'actionlint'));
+ 	});
+ 
+ 	test('appends .exe on Windows only', () => {
+diff --git a/distribution/npm/facade/test/result-types.ts b/distribution/npm/facade/test/result-types.ts
+index 5d5f6e4a69acf7467267683f581c066f2a8803f5..b8d057c497894c2f7ca9bd7fba3397cad2e5ae92 100644
+--- a/distribution/npm/facade/test/result-types.ts
++++ b/distribution/npm/facade/test/result-types.ts
+@@ -1,5 +1,5 @@
+ // Compile against the package export, as an npm consumer would.
+-import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kjanat/actionlint/result';
++import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kajaux/actionlint-rehearsal/result';
+ 
+ export function completedStatus(result: CheckResult): 0 | 1 | undefined {
+ 	if (result.completed) return result.exit_code;
+diff --git a/distribution/npm/targets.json b/distribution/npm/targets.json
+index 5addebe055120316deca4161fd6b47f0ea1951d6..464b06a241c98f04e579b53005af6f0402a09748 100644
+--- a/distribution/npm/targets.json
++++ b/distribution/npm/targets.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "./targets.schema.json",
+-  "facade": "@kjanat/actionlint",
+-  "platformScope": "@kjanat-actionlint",
++  "facade": "@kajaux/actionlint-rehearsal",
++  "platformScope": "@kajaux",
+   "binary": "actionlint",
+   "targets": [
+     { "pkg": "darwin-arm64", "os": "darwin",  "cpu": "arm64", "asset": "darwin_arm64",  "format": "tar.gz", "tier": 1 },
+diff --git a/package-lock.json b/package-lock.json
+index bedbbf3c001519a76375fa37b71f11fa4d861452..59b983401e699293f547896cba071c3269e36873 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -28,7 +28,7 @@
+       }
+     },
+     "distribution/npm/facade": {
+-      "name": "@kjanat/actionlint",
++      "name": "@kajaux/actionlint-rehearsal",
+       "version": "0.0.0",
+       "license": "MIT",
+       "dependencies": {
+@@ -843,7 +843,7 @@
+       "dev": true,
+       "license": "MIT"
+     },
+-    "node_modules/@kjanat/actionlint": {
++    "node_modules/@kajaux/actionlint-rehearsal": {
+       "resolved": "distribution/npm/facade",
+       "link": true
+     },
+diff --git a/packages/github-action/src/tools.ts b/packages/github-action/src/tools.ts
+index 67e14a2ad1be8d87f2b182991b0bb135a1417855..3653d47eeffb79b6f3e68c1c639cbd037b35a806 100644
+--- a/packages/github-action/src/tools.ts
++++ b/packages/github-action/src/tools.ts
+@@ -59,7 +59,7 @@ export async function nativeBinary(version: string, platform: RunnerPlatform, di
+ 	const binary = platform.os === 'windows' ? 'actionlint.exe' : 'actionlint';
+ 	console.log(`Downloading actionlint ${version} (${platform.os}/${platform.arch})`);
+ 	const name = nativeAssetName(version, platform);
+-	const base = `https://github.com/kjanat/actionlint/releases/download/v${version}`;
++	const base = `https://github.com/kajaux/actionlint-release-rehearsal/releases/download/v${version}`;
+ 	const checksums = await download(
+ 		`${base}/actionlint_${version}_checksums.txt`,
+ 		join(directory, 'checksums.txt'),

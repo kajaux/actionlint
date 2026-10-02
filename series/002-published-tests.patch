@@ -1,0 +1,74 @@
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 47cad02b074dc22ae534108babd1e59ec241e70c..cf0830834753d36da031308714630226b82fb2b0 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -139,7 +139,7 @@ jobs:
+             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
+               --digestfile "${RUNNER_TEMP}/ghcr.io.digest" \
+               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.tar" \
+-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
++              "docker://ghcr.io/kajaux/actionlint:${tag}"
+             expected="$(cat "${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.digest")"
+             actual="$(cat "${RUNNER_TEMP}/ghcr.io.digest")"
+             test "${actual}" = "${expected}"
+@@ -163,15 +163,15 @@ jobs:
+             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
+               --digestfile "${RUNNER_TEMP}/action-image.digest" \
+               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-action-container_${VERSION}.tar" \
+-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
++              "docker://ghcr.io/kajaux/actionlint:${tag}"
+             actual="$(cat "${RUNNER_TEMP}/action-image.digest")"
+             test "${actual}" = "${expected}"
+           done
+           echo "digest=${expected}" >> "${GITHUB_OUTPUT}"
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
++        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
++        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
+   action-smoke:
+     name: Check published Action pins (${{ matrix.os }})
+     needs: verify
+@@ -193,6 +193,7 @@ jobs:
+           mkdir .published-action-test
+           sed -e "s|OWNER/REPO@RELEASE_TAG|${GITHUB_REPOSITORY}@v${VERSION}|g" \
+             -e "s|OWNER/REPO@COMMIT_SHA|${GITHUB_REPOSITORY}@${CANDIDATE}|g" \
++            -e "s|RELEASE_TAG|v${VERSION}|g" \
+             scripts/testdata/published-action/action.yml > .published-action-test/action.yml
+       - name: Resolve both published references through the runner
+         # The prepared composite contains literal external uses references.
+diff --git a/scripts/testdata/published-action/action.yml b/scripts/testdata/published-action/action.yml
+index c76486b344410b3eb5704908ba0a01d9f96d9830..e32469cfdc91aab1b48b8cdcd10407e9a91db697 100644
+--- a/scripts/testdata/published-action/action.yml
++++ b/scripts/testdata/published-action/action.yml
+@@ -3,6 +3,29 @@ description: Run the published version and commit through the runner and verify
+ runs:
+   using: composite
+   steps:
++    - name: Write version selection file
++      shell: bash
++      env: { EXPECTED_TAG: RELEASE_TAG }
++      run: echo "actionlint ${EXPECTED_TAG#v}" > .rehearsal-tool-versions
++    - id: install
++      uses: OWNER/REPO@RELEASE_TAG
++      env: { ACTIONLINT_ACTION_BINARY: "" }
++      with: { version: RELEASE_TAG, install-only: "true", shellcheck: "false", pyflakes: "false" }
++    - name: Exercise installed binary from PATH
++      shell: bash
++      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.install.outputs.version }}" }
++      run: |
++        test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
++        actionlint -version | head -1 | grep -F "${EXPECTED_VERSION#v}"
++        actionlint check --no-config --shellcheck= --pyflakes= testdata/ok/minimal.yaml
++    - id: version_file
++      uses: OWNER/REPO@RELEASE_TAG
++      env: { ACTIONLINT_ACTION_BINARY: "" }
++      with: { version-file: .rehearsal-tool-versions, install-only: "true", shellcheck: "false", pyflakes: "false" }
++    - name: Verify version file selection
++      shell: bash
++      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.version_file.outputs.version }}" }
++      run: test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
+     - id: version
+       uses: OWNER/REPO@RELEASE_TAG
+       env: { ACTIONLINT_ACTION_BINARY: "" }

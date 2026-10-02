@@ -1,0 +1,707 @@
+diff --git a/.github/actions/npm-publish/action.yml b/.github/actions/npm-publish/action.yml
+index bf38a6ce595e9ffc78973e7c6b9af570c4f74996..1a0767c7d4fdf8c765cb528536546661c865a36c 100644
+--- a/.github/actions/npm-publish/action.yml
++++ b/.github/actions/npm-publish/action.yml
+@@ -51,7 +51,7 @@ runs:
+         version="$(jq -er .version <<<"${manifest}")"
+ 
+         # Fork-only boundary: neither production names nor npmjs can be written.
+-        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint-release-rehearsal' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
++        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
+           echo '::error::Publishing is restricted to the isolated rehearsal repository and GitHub Packages.'
+           exit 1
+         fi
+@@ -59,7 +59,7 @@ runs:
+         @kajaux/actionlint-rehearsal | @kajaux/actionlint-*) ;;
+         *) echo "::error::Unexpected rehearsal package ${name}"; exit 1 ;;
+         esac
+-        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint-release-rehearsal.git"' <<<"${manifest}"
++        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint.git"' <<<"${manifest}"
+         args=(--registry "${REGISTRY}" --tag "${DIST_TAG}")
+         if [[ "${DRY_RUN}" == 'true' ]]; then
+           # Allow testing existing releases; --dry-run still prevents uploads.
+@@ -70,5 +70,5 @@ runs:
+         {
+           echo "name=${name}"
+           echo "version=${version}"
+-          echo "url=https://github.com/kajaux/actionlint-release-rehearsal/packages"
++          echo "url=https://github.com/kajaux/actionlint/packages"
+         } >> "${GITHUB_OUTPUT}"
+diff --git a/.github/workflows/npm-release.yml b/.github/workflows/npm-release.yml
+index df63d5a0378ea336ffe811d9de60abe29258d991..a44084a9e7e19134485c453c0cc36279c65ea5f6 100644
+--- a/.github/workflows/npm-release.yml
++++ b/.github/workflows/npm-release.yml
+@@ -43,7 +43,7 @@ jobs:
+       node: ${{ steps.node.outputs.version }}
+     steps:
+       - name: Require the isolated rehearsal repository
+-        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint-release-rehearsal'
++        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint'
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+         with: { ref: "${{ case(inputs.dry-run, github.sha, format('refs/tags/{0}', env.RELEASE_TAG)) }}", persist-credentials: false }
+       # Manual recovery requires verified release bytes even if a later publishing job failed.
+diff --git a/.github/workflows/release-prepare.yml b/.github/workflows/release-prepare.yml
+index 3263a57746db2e00e19b88706bd2456b52989681..63d197b0cd7d63cf147020843a73c2442769d1ad 100644
+--- a/.github/workflows/release-prepare.yml
++++ b/.github/workflows/release-prepare.yml
+@@ -4,7 +4,7 @@ on:
+   workflow_dispatch:
+     inputs:
+       version: { description: "Stable version (MAJOR.MINOR.PATCH)", required: true, type: string }
+-      source: { description: Expected master commit; empty uses the selected master revision, required: false, type: string }
++      source: { description: Expected tests commit; empty uses the selected tests revision, required: false, type: string }
+ 
+ concurrency:
+   group: actionlint-release
+@@ -31,7 +31,7 @@ jobs:
+       - name: Check requested source and version
+         env: { EXPECTED_SOURCE: "${{ inputs.source }}" }
+         run: |
+-          test "${GITHUB_REF}" = refs/heads/master
++          test "${GITHUB_REF}" = refs/heads/tests
+           test -z "${EXPECTED_SOURCE}" || test "${EXPECTED_SOURCE}" = "${GITHUB_SHA}"
+           [[ "${VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+           existing_tag="$(git tag --list "v${VERSION}")"
+diff --git a/.goreleaser.yaml b/.goreleaser.yaml
+index 6036169a51af7d0b33f77527b93580ca06437cae..62cc09456ed301f7cff51c738843cacd672a756b 100644
+--- a/.goreleaser.yaml
++++ b/.goreleaser.yaml
+@@ -81,8 +81,8 @@ homebrew_casks:
+       base_name: actionlint
+       shells: [bash, zsh, fish, pwsh]
+     url:
+-      template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+-      verified: github.com/kajaux/actionlint-release-rehearsal/
++      template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++      verified: github.com/kajaux/actionlint/
+     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
+     homepage: https://actionlint.kjanat.dev
+     description: Static checker for GitHub Actions workflow files
+@@ -110,7 +110,7 @@ scoops:
+     # that directory exists, leaving the root to the bucket's own config.
+     directory: bucket
+     goamd64: v1
+-    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+     homepage: https://actionlint.kjanat.dev
+     description: Static checker for GitHub Actions workflow files
+@@ -132,7 +132,7 @@ winget:
+     default_locale: en-US
+     publisher: kjanat
+     publisher_url: https://github.com/kjanat
+-    publisher_support_url: https://github.com/kajaux/actionlint-release-rehearsal/issues
++    publisher_support_url: https://github.com/kajaux/actionlint/issues
+     author: Kaj Kowalski
+     homepage: https://actionlint.kjanat.dev
+     short_description: Static checker for GitHub Actions workflow files
+@@ -141,18 +141,18 @@ winget:
+       placeholders, the shell scripts in run: steps, and many other mistakes that only surface once a workflow
+       runs. This is the kjanat fork.
+     license: MIT
+-    license_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
++    license_url: "https://github.com/kajaux/actionlint/blob/{{ .Tag }}/LICENSE.txt"
+     copyright: Copyright (c) 2026 Kaj Kowalski, Copyright (c) 2021 rhysd
+-    copyright_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
++    copyright_url: "https://github.com/kajaux/actionlint/blob/{{ .Tag }}/LICENSE.txt"
+     release_notes: "{{ .Changelog }}"
+-    release_notes_url: "https://github.com/kajaux/actionlint-release-rehearsal/releases/tag/{{ .Tag }}"
++    release_notes_url: "https://github.com/kajaux/actionlint/releases/tag/{{ .Tag }}"
+     installation_notes: >-
+       ShellCheck and pyflakes are optional; when installed, actionlint can use them
+       to check shell and Python scripts in workflow run steps.
+     tags: [actionlint, github-actions, workflow, linter, static-analysis, yaml, ci]
+     ids: [windows]
+     goamd64: v1
+-    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     commit_msg_template: "New version: {{ .PackageIdentifier }} {{ .Version }}"
+     # Resume uploads after microsoft/winget-pkgs#430563 is merged.
+     skip_upload: true
+@@ -185,7 +185,7 @@ aurs:
+     maintainers: ["Kaj Kowalski <info at kajkowalski dot nl>"]
+     license: MIT
+     rel: "1"
+-    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+     git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat-bin.git
+     commit_msg_template: "Update to {{ .Tag }}"
+@@ -224,7 +224,7 @@ aur_sources:
+     maintainers: ["Kaj Kowalski <info at kajkowalski dot nl>"]
+     license: MIT
+     rel: "1"
+-    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+     private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+     git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat.git
+     commit_msg_template: "Update to {{ .Tag }}"
+diff --git a/Dockerfile b/Dockerfile
+index 1e574135db82b1e2a93123a920adf3ec03dbfb5e..41229fad58fc81d1fde16fa0f84939b470863df2 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -13,7 +13,7 @@ RUN go build -v -ldflags "-s -w -X actionlint.kjanat.dev.version=${ACTIONLINT_VE
+ FROM koalaman/shellcheck-alpine:stable AS shellcheck
+ 
+ FROM alpine:${ALPINE_VER} AS runtime
+-LABEL org.opencontainers.image.source="https://github.com/kajaux/actionlint-release-rehearsal"
++LABEL org.opencontainers.image.source="https://github.com/kajaux/actionlint"
+ LABEL org.opencontainers.image.licenses="MIT"
+ RUN apk add --no-cache python3 py3-pyflakes
+ COPY --from=builder /go/src/app/actionlint /usr/local/bin/
+diff --git a/distribution/npm/facade/package.json b/distribution/npm/facade/package.json
+index 41e292a8131833dabee591c70e14b3fc0e9e5e88..16758f833c07a77d9f7bd35762ebac94dd432a89 100644
+--- a/distribution/npm/facade/package.json
++++ b/distribution/npm/facade/package.json
+@@ -13,13 +13,13 @@
+     "yaml",
+     "shellcheck"
+   ],
+-  "homepage": "https://github.com/kajaux/actionlint-release-rehearsal",
++  "homepage": "https://github.com/kajaux/actionlint",
+   "bugs": {
+-    "url": "https://github.com/kajaux/actionlint-release-rehearsal/issues"
++    "url": "https://github.com/kajaux/actionlint/issues"
+   },
+   "repository": {
+     "type": "git",
+-    "url": "git+https://github.com/kajaux/actionlint-release-rehearsal.git"
++    "url": "git+https://github.com/kajaux/actionlint.git"
+   },
+   "funding": {
+     "type": "github",
+diff --git a/packages/github-action/src/tools.ts b/packages/github-action/src/tools.ts
+index 3653d47eeffb79b6f3e68c1c639cbd037b35a806..9a94bff07ad06ec52bdca3294b81bee4dd9c48f3 100644
+--- a/packages/github-action/src/tools.ts
++++ b/packages/github-action/src/tools.ts
+@@ -59,7 +59,7 @@ export async function nativeBinary(version: string, platform: RunnerPlatform, di
+ 	const binary = platform.os === 'windows' ? 'actionlint.exe' : 'actionlint';
+ 	console.log(`Downloading actionlint ${version} (${platform.os}/${platform.arch})`);
+ 	const name = nativeAssetName(version, platform);
+-	const base = `https://github.com/kajaux/actionlint-release-rehearsal/releases/download/v${version}`;
++	const base = `https://github.com/kajaux/actionlint/releases/download/v${version}`;
+ 	const checksums = await download(
+ 		`${base}/actionlint_${version}_checksums.txt`,
+ 		join(directory, 'checksums.txt'),
+diff --git a/scripts/bump-version/bump_test.go b/scripts/bump-version/bump_test.go
+index 0b59c9532c81ce9dccf59e6a562ed44deae32a02..00919c5966d9cebc2617f187474d45ea620ca2e5 100644
+--- a/scripts/bump-version/bump_test.go
++++ b/scripts/bump-version/bump_test.go
+@@ -420,7 +420,7 @@ func gitRepo(t *testing.T) *repo {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	run("init", "--initial-branch=master")
++	run("init", "--initial-branch=tests")
+ 	run("config", "user.email", "test@example.com")
+ 	run("config", "user.name", "test")
+ 	run("config", "commit.gpgsign", "false")
+@@ -526,13 +526,13 @@ func releaseRepo(t *testing.T) *repo {
+ - Test release notes.
+ 
+ <a id="v9.9.8"></a>
+-## [v9.9.8](https://github.com/kjanat/actionlint/releases/tag/v9.9.8) - 2026-01-01
++## [v9.9.8](https://github.com/kajaux/actionlint/releases/tag/v9.9.8) - 2026-01-01
+ 
+ - Previous release.
+ 
+ [Changes][v9.9.8]
+ 
+-[v9.9.8]: https://github.com/kjanat/actionlint/compare/v9.9.7...v9.9.8
++[v9.9.8]: https://github.com/kajaux/actionlint/compare/v9.9.7...v9.9.8
+ `
+ 	if err := os.WriteFile(filepath.Join(r.root, changelogFile), []byte(changelog), 0o644); err != nil {
+ 		t.Fatal(err)
+@@ -616,13 +616,13 @@ func TestCheckChangelogAcceptsUnreleasedEntries(t *testing.T) {
+ - Report ShellCheck findings at their source locations.
+ 
+ <a id="v1.10.0"></a>
+-# [v1.10.0](https://github.com/kjanat/actionlint/releases/tag/v1.10.0) - 2026-08-19
++# [v1.10.0](https://github.com/kajaux/actionlint/releases/tag/v1.10.0) - 2026-08-19
+ 
+ - Move the module.
+ 
+ [Changes][v1.10.0]
+ 
+-[v1.10.0]: https://github.com/kjanat/actionlint/compare/v1.9.0...v1.10.0
++[v1.10.0]: https://github.com/kajaux/actionlint/compare/v1.9.0...v1.10.0
+ `)
+ 	if err := checkChangelog(root); err != nil {
+ 		t.Fatal(err)
+@@ -680,13 +680,13 @@ const oneChangelogSection = `<a id="unreleased"></a>
+ 
+ <a id="v1.11.0"></a>
+ 
+-# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0) - 2026-08-20
++# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0) - 2026-08-20
+ 
+ - Release the thing.
+ 
+ [Changes][v1.11.0]
+ 
+-[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0
++[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0
+ `
+ 
+ func TestCheckChangelogSectionsAcceptsCompleteSection(t *testing.T) {
+@@ -714,10 +714,10 @@ func TestSectionizeChangelogCreatesSection(t *testing.T) {
+ 		t.Fatalf("the Unreleased heading still lists %v", entries)
+ 	}
+ 	text := string(content)
+-	if !strings.Contains(text, "## [v1.12.0](https://github.com/kjanat/actionlint/releases/tag/v1.12.0) - 2026-08-28") {
++	if !strings.Contains(text, "## [v1.12.0](https://github.com/kajaux/actionlint/releases/tag/v1.12.0) - 2026-08-28") {
+ 		t.Fatalf("the section heading is missing:\n%s", text)
+ 	}
+-	if !strings.Contains(text, "[v1.12.0]: https://github.com/kjanat/actionlint/compare/v1.11.0...v1.12.0\n[v1.11.0]:") {
++	if !strings.Contains(text, "[v1.12.0]: https://github.com/kajaux/actionlint/compare/v1.11.0...v1.12.0\n[v1.11.0]:") {
+ 		t.Fatalf("the link definition is missing or misplaced:\n%s", text)
+ 	}
+ }
+@@ -748,16 +748,16 @@ func TestSectionizeChangelogFirstRelease(t *testing.T) {
+ 	if err := checkChangelogSections(content); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if !strings.Contains(string(content), "[v1.0.0]: https://github.com/kjanat/actionlint/tree/v1.0.0") {
++	if !strings.Contains(string(content), "[v1.0.0]: https://github.com/kajaux/actionlint/tree/v1.0.0") {
+ 		t.Fatalf("the first release link definition is missing:\n%s", content)
+ 	}
+ }
+ 
+ func TestCheckChangelogSectionsRejectsIncompleteSection(t *testing.T) {
+ 	for name, drop := range map[string]string{
+-		"heading":         "# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0) - 2026-08-20",
++		"heading":         "# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0) - 2026-08-20",
+ 		"changes link":    "[Changes][v1.11.0]",
+-		"link definition": "[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0",
++		"link definition": "[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0",
+ 	} {
+ 		t.Run(name, func(t *testing.T) {
+ 			content := strings.Replace(oneChangelogSection, drop, "", 1)
+@@ -866,8 +866,8 @@ func TestChangelogReleaseRejects(t *testing.T) {
+ func TestCheckChangelogSectionsRejectsBrokenSection(t *testing.T) {
+ 	for name, tc := range map[string]struct{ from, to, want string }{
+ 		"heading of another release": {
+-			"# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.11.0)",
+-			"# [v1.11.0](https://github.com/kjanat/actionlint/releases/tag/v1.10.0)",
++			"# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.11.0)",
++			"# [v1.11.0](https://github.com/kajaux/actionlint/releases/tag/v1.10.0)",
+ 			"links to the release page of v1.10.0",
+ 		},
+ 		"changes link of another release": {
+@@ -876,8 +876,8 @@ func TestCheckChangelogSectionsRejectsBrokenSection(t *testing.T) {
+ 			"links its changes to v1.10.0",
+ 		},
+ 		"link definition of another release": {
+-			"[v1.11.0]: https://github.com/kjanat/actionlint/compare/v1.10.0...v1.11.0",
+-			"[v1.10.0]: https://github.com/kjanat/actionlint/compare/v1.9.0...v1.10.0",
++			"[v1.11.0]: https://github.com/kajaux/actionlint/compare/v1.10.0...v1.11.0",
++			"[v1.10.0]: https://github.com/kajaux/actionlint/compare/v1.9.0...v1.10.0",
+ 			"declares no v1.10.0 section",
+ 		},
+ 		"link definition pointing elsewhere": {
+diff --git a/scripts/bump-version/changelog.go b/scripts/bump-version/changelog.go
+index 82b9f109fdf4146dd57c25831d2fb0e15f2a6f14..e6ae7b8d4a173103addd68ae6b0537447ade1d75 100644
+--- a/scripts/bump-version/changelog.go
++++ b/scripts/bump-version/changelog.go
+@@ -172,7 +172,7 @@ func changelogRelease(content []byte, v version) error {
+ 	return err
+ }
+ 
+-const changelogRepoURL = "https://github.com/kjanat/actionlint"
++const changelogRepoURL = "https://github.com/kajaux/actionlint"
+ 
+ var changelogUnreleased = regexp.MustCompile(`(?m)^` + unreleasedHeading + `[ \t]*\r?$`)
+ 
+diff --git a/scripts/bump-version/main.go b/scripts/bump-version/main.go
+index 29e587dbf326cf4cfd0ee49cd11343f17f013e81..26aec841922c14524c691c0af08a1ea59cbd3a25 100644
+--- a/scripts/bump-version/main.go
++++ b/scripts/bump-version/main.go
+@@ -16,7 +16,7 @@ import (
+ 	"time"
+ )
+ 
+-const releaseJobURL = "https://github.com/kjanat/actionlint/actions/workflows/release-prepare.yml"
++const releaseJobURL = "https://github.com/kajaux/actionlint/actions/workflows/release-prepare.yml"
+ 
+ const releaseTimeZone = "Europe/Amsterdam"
+ 
+@@ -92,8 +92,8 @@ func (r *repo) preflight(tag string) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	if branch != "master" {
+-		return fmt.Errorf("this command must run on the 'master' branch but the current branch is %q", branch)
++	if branch != "tests" {
++		return fmt.Errorf("this command must run on the 'tests' branch but the current branch is %q", branch)
+ 	}
+ 
+ 	if _, err := r.git("rev-parse", "--verify", "--quiet", "refs/tags/"+tag); err == nil {
+@@ -110,11 +110,13 @@ func (r *repo) preflight(tag string) error {
+ }
+ 
+ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+-	var check, commit, push bool
+-	var root, notes, nix string
++	var check, commit, push, prepareOnly bool
++	var root, notes, nix, date string
+ 
+ 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
+ 	flags.BoolVar(&check, "check", false, "verify the declared version references and exit without modifying anything")
++	flags.BoolVar(&prepareOnly, "prepare-only", false, "update test source without Nix, committing, pushing, or publishing; requires -date")
++	flags.StringVar(&date, "date", "", "changelog date (YYYY-MM-DD)")
+ 	flags.StringVar(&notes, "notes", "", "print the changelog section of the given version tag and exit")
+ 	flags.BoolVar(&commit, "commit", false, "create the version bump commit after verification; no tag or publication")
+ 	flags.BoolVar(&push, "push", false, "push the source commit and dispatch draft release preparation, implies -commit")
+@@ -167,6 +169,14 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+ 		return err
+ 	}
+ 	tag := "v" + v.String()
++	if prepareOnly && (commit || push || date == "") {
++		return errors.New("-prepare-only requires -date and cannot commit or push")
++	}
++	if date != "" {
++		if _, err := time.Parse("2006-01-02", date); err != nil {
++			return fmt.Errorf("invalid changelog date: %w", err)
++		}
++	}
+ 
+ 	r := &repo{ctx: ctx, root: root, out: stdout}
+ 	if err := r.preflight(tag); err != nil {
+@@ -175,9 +185,12 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+ 	if err := CheckChangelogRelease(root, v, stdout); err != nil {
+ 		return err
+ 	}
+-	nixArgs, err := r.nixCommand(nix)
+-	if err != nil {
+-		return err
++	var nixArgs []string
++	if !prepareOnly {
++		nixArgs, err = r.nixCommand(nix)
++		if err != nil {
++			return err
++		}
+ 	}
+ 
+ 	_, _ = fmt.Fprintf(stdout, "Bumping the version to %s (tag: %s)\n", v, tag)
+@@ -188,9 +201,16 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	if err := SectionizeChangelog(root, v, time.Now().In(zone).Format("2006-01-02"), stdout); err != nil {
++	if date == "" {
++		date = time.Now().In(zone).Format("2006-01-02")
++	}
++	if err := SectionizeChangelog(root, v, date, stdout); err != nil {
+ 		return err
+ 	}
++	if prepareOnly {
++		_, _ = fmt.Fprintln(stdout, "Test source updated. Nix and publication were not run.")
++		return nil
++	}
+ 	if err := r.checkNix(nixArgs, stderr); err != nil {
+ 		return err
+ 	}
+@@ -199,8 +219,8 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+ 		_, _ = fmt.Fprint(stdout, "\nAll version references were updated and verified. To prepare a release draft, run:\n\n")
+ 		_, _ = fmt.Fprintf(stdout, "  git add %s\n", strings.Join(append(paths(targets), changelogFile), " "))
+ 		_, _ = fmt.Fprintf(stdout, "  git commit -m 'bump up version to %s'\n", tag)
+-		_, _ = fmt.Fprint(stdout, "  git push origin master\n")
+-		_, _ = fmt.Fprintf(stdout, "  gh workflow run release-prepare.yml --ref master -f version=%s\n", v)
++		_, _ = fmt.Fprint(stdout, "  git push origin tests\n")
++		_, _ = fmt.Fprintf(stdout, "  gh workflow run release-prepare.yml --ref tests -f version=%s\n", v)
+ 		return nil
+ 	}
+ 
+@@ -212,24 +232,24 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+ 	}
+ 	if !push {
+ 		_, _ = fmt.Fprint(stdout, "\nThe source commit was created locally. No tag or release was created. To prepare the draft, run:\n\n")
+-		_, _ = fmt.Fprint(stdout, "  git push origin master\n")
+-		_, _ = fmt.Fprintf(stdout, "  gh workflow run release-prepare.yml --ref master -f version=%s\n", v)
++		_, _ = fmt.Fprint(stdout, "  git push origin tests\n")
++		_, _ = fmt.Fprintf(stdout, "  gh workflow run release-prepare.yml --ref tests -f version=%s\n", v)
+ 		return nil
+ 	}
+ 
+-	if err := r.run("push", "origin", "master"); err != nil {
++	if err := r.run("push", "origin", "tests"); err != nil {
+ 		return err
+ 	}
+ 	source, err := r.git("rev-parse", "HEAD")
+ 	if err != nil {
+ 		return err
+ 	}
+-	cmd := exec.CommandContext(ctx, "gh", "workflow", "run", "release-prepare.yml", "--ref", "master", "-f", "version="+v.String(), "-f", "source="+source)
++	cmd := exec.CommandContext(ctx, "gh", "workflow", "run", "release-prepare.yml", "--ref", "tests", "-f", "version="+v.String(), "-f", "source="+source)
+ 	cmd.Dir = root
+ 	cmd.Stdout = stdout
+ 	cmd.Stderr = stderr
+ 	if err := cmd.Run(); err != nil {
+-		return fmt.Errorf("source commit pushed, but draft preparation was not dispatched; retry gh workflow run release-prepare.yml --ref master -f version=%s -f source=%s: %w", v, source, err)
++		return fmt.Errorf("source commit pushed, but draft preparation was not dispatched; retry gh workflow run release-prepare.yml --ref tests -f version=%s -f source=%s: %w", v, source, err)
+ 	}
+ 
+ 	_, _ = fmt.Fprintf(stdout, "\nCheck draft preparation at %s\nAfter it succeeds, promote the tested candidate with: node scripts/release-candidate.mjs promote --version %s --run RUN_ID\n", releaseJobURL, v)
+diff --git a/scripts/bump-version/prepare_test.go b/scripts/bump-version/prepare_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..374739510c59b0cb753c2953c6e2ffe7a988cf6b
+--- /dev/null
++++ b/scripts/bump-version/prepare_test.go
+@@ -0,0 +1,52 @@
++package main
++
++import (
++	"bytes"
++	"io"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestPrepareOnlyUpdatesSourceWithoutPublishing(t *testing.T) {
++	r := releaseRepo(t)
++	before, err := r.git("rev-parse", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	args := []string{"bump-version", "-root", r.root, "-prepare-only", "-date", "2026-10-02", "-nix-command", "must-not-run", "9.9.9"}
++	if err := Main(t.Context(), args, io.Discard, io.Discard); err != nil {
++		t.Fatal(err)
++	}
++	if err := Check(r.root, targets, io.Discard); err != nil {
++		t.Fatal(err)
++	}
++	content, err := os.ReadFile(filepath.Join(r.root, changelogFile))
++	if err != nil || !bytes.Contains(content, []byte("/v9.9.9) - 2026-10-02")) {
++		t.Fatalf("fixed changelog date missing: %v", err)
++	}
++	if after, err := r.git("rev-parse", "HEAD"); err != nil || after != before {
++		t.Fatalf("preparation committed: %q, %v", after, err)
++	}
++	if tags, err := r.git("tag", "--list"); err != nil || tags != "" {
++		t.Fatalf("preparation tagged: %q, %v", tags, err)
++	}
++	if refs, err := r.git("ls-remote", "origin"); err != nil || refs != "" {
++		t.Fatalf("preparation pushed: %q, %v", refs, err)
++	}
++}
++
++func TestPrepareOnlyRejectsPublicationAndMissingDate(t *testing.T) {
++	for _, extra := range [][]string{
++		{},
++		{"-date", "2026-10-02", "-commit"},
++		{"-date", "2026-10-02", "-push"},
++		{"-date", "2026-02-30"},
++	} {
++		args := append([]string{"bump-version", "-prepare-only"}, extra...)
++		args = append(args, "9.9.9")
++		if err := Main(t.Context(), args, io.Discard, io.Discard); err == nil {
++			t.Fatalf("accepted %v", args)
++		}
++	}
++}
+diff --git a/scripts/release-candidate.mjs b/scripts/release-candidate.mjs
+index 28de9ba162092c2478c5a1c1bf065e013438d37d..6ed5274e962d72c31d41e2783b203ce6e187458e 100644
+--- a/scripts/release-candidate.mjs
++++ b/scripts/release-candidate.mjs
+@@ -269,10 +269,10 @@ export function verifyRun(value, manifest) {
+ 	const repository = object(run.repository, 'workflow repository');
+ 	if (
+ 		run.id !== manifest.run_id || run.run_attempt !== manifest.run_attempt
+-		|| run.event !== 'workflow_dispatch' || run.path !== workflowPath || run.head_branch !== 'master'
++		|| run.event !== 'workflow_dispatch' || run.path !== workflowPath || run.head_branch !== 'tests'
+ 		|| run.head_sha !== manifest.source || repository.full_name !== manifest.repository
+ 		|| run.status !== 'completed' || run.conclusion !== 'success'
+-	) throw new Error('Candidate does not match a successful release preparation run on master');
++	) throw new Error('Candidate does not match a successful release preparation run on tests');
+ }
+ 
+ /** @param {string} root @param {string} endpoint @param {Record<string, unknown>} [body] @returns {unknown} */
+@@ -355,19 +355,19 @@ export function finalizePromotion(manifest, release, operations) {
+ 		return { tag: manifest.tag, releaseID, alreadyPublished: true };
+ 	}
+ 	if (release.target_commitish !== manifest.source) throw new Error('Draft target differs from prepared source');
+-	if (runGit('branch', '--show-current') !== 'master' || runGit('status', '--porcelain', '--untracked-files=all')) {
+-		throw new Error('Promotion requires a clean master checkout');
++	if (runGit('branch', '--show-current') !== 'tests' || runGit('status', '--porcelain', '--untracked-files=all')) {
++		throw new Error('Promotion requires a clean tests checkout');
+ 	}
+ 	let head = runGit('rev-parse', 'HEAD');
+ 	if (head !== manifest.source && !isRecordedRelease(runGit, head, manifest)) {
+ 		throw new Error('Source advanced since preparation; prepare a new candidate or return to the prepared source');
+ 	}
+-	const remoteHead = runGit('ls-remote', 'origin', 'refs/heads/master').split('\t')[0];
++	const remoteHead = runGit('ls-remote', 'origin', 'refs/heads/tests').split('\t')[0];
+ 	commitValue(remoteHead);
+ 	if (remoteHead !== manifest.source && remoteHead !== head) {
+-		runGit('fetch', '--no-tags', '--no-write-fetch-head', 'origin', 'refs/heads/master');
++		runGit('fetch', '--no-tags', '--no-write-fetch-head', 'origin', 'refs/heads/tests');
+ 		if (!isRecordedRelease(runGit, remoteHead, manifest) || head !== manifest.source) {
+-			throw new Error('Remote master advanced since preparation');
++			throw new Error('Remote tests advanced since preparation');
+ 		}
+ 		runGit('merge', '--ff-only', remoteHead);
+ 		head = remoteHead;
+@@ -387,7 +387,7 @@ export function finalizePromotion(manifest, release, operations) {
+ 		}
+ 	}
+ 	try {
+-		runGit('-c', 'push.followTags=false', 'push', '--atomic', 'origin', 'HEAD:refs/heads/master', `${ref}:${ref}`);
++		runGit('-c', 'push.followTags=false', 'push', '--atomic', 'origin', 'HEAD:refs/heads/tests', `${ref}:${ref}`);
+ 	} catch (error) {
+ 		throw new Error(
+ 			`The signed tag and ancestry commit are prepared. Rerun promotion with --version ${manifest.version} --run ${manifest.run_id} to verify or resume the atomic push.`,
+diff --git a/scripts/release-candidate.test.mjs b/scripts/release-candidate.test.mjs
+index ecf1129397b63f53cb6187e9cf4b1d13e354f33e..96335bd75a7d95899df7e1c61d9e2dd0af90c738 100644
+--- a/scripts/release-candidate.test.mjs
++++ b/scripts/release-candidate.test.mjs
+@@ -27,10 +27,10 @@ test('pending draft tags resolve through gh before fetching the release by ID',
+ 	const release = { id: 77, tag_name: 'v1.17.1', draft: true };
+ 	/** @type {string[][]} */
+ 	const calls = [];
+-	const found = findRelease('kjanat/actionlint', 'v1.17.1', (args) => {
++	const found = findRelease('kajaux/actionlint', 'v1.17.1', (args) => {
+ 		calls.push(args);
+ 		if (args[0] === 'release') return '77';
+-		assert.deepEqual(args, ['api', 'repos/kjanat/actionlint/releases/77']);
++		assert.deepEqual(args, ['api', 'repos/kajaux/actionlint/releases/77']);
+ 		return JSON.stringify(release);
+ 	});
+ 	assert.deepEqual(found, release);
+@@ -39,19 +39,19 @@ test('pending draft tags resolve through gh before fetching the release by ID',
+ 		'view',
+ 		'v1.17.1',
+ 		'--repo',
+-		'kjanat/actionlint',
++		'kajaux/actionlint',
+ 		'--json',
+ 		'databaseId',
+ 		'--jq',
+ 		'.databaseId',
+ 	]);
+-	assert.throws(() => findRelease('kjanat/actionlint', 'v1.17.1', () => 'null'), /release ID/);
++	assert.throws(() => findRelease('kajaux/actionlint', 'v1.17.1', () => 'null'), /release ID/);
+ });
+ 
+ function exampleManifest() {
+ 	return parseManifest({
+ 		schema_version: 1,
+-		repository: 'kjanat/actionlint',
++		repository: 'kajaux/actionlint',
+ 		version: '1.17.1',
+ 		tag: 'v1.17.1',
+ 		workflow: workflowPath,
+@@ -81,9 +81,9 @@ test('candidate provenance requires the successful exact workflow attempt and so
+ 		run_attempt: 2,
+ 		event: 'workflow_dispatch',
+ 		path: workflowPath,
+-		head_branch: 'master',
++		head_branch: 'tests',
+ 		head_sha: manifest.source,
+-		repository: { full_name: 'kjanat/actionlint' },
++		repository: { full_name: 'kajaux/actionlint' },
+ 		status: 'completed',
+ 		conclusion: 'success',
+ 	};
+@@ -177,7 +177,7 @@ await writeFile(join(directory, 'SHA256SUMS'), createHash('sha256').update(code)
+ 			await writeFile(join(assets, `${name}.digest`), `sha256:${'a'.repeat(64)}\n`);
+ 		}
+ 		const manifest = await writeManifest(root, assets, { version, source, candidate }, {
+-			GITHUB_REPOSITORY: 'kjanat/actionlint',
++			GITHUB_REPOSITORY: 'kajaux/actionlint',
+ 			GITHUB_RUN_ID: '123',
+ 			GITHUB_RUN_ATTEMPT: '2',
+ 		});
+@@ -256,8 +256,8 @@ function promotionFixture() {
+ 		git: (...args) => {
+ 			const [cmd, ...rest] = args;
+ 			if (cmd === 'ls-remote') {
+-				return rest[1] === 'refs/heads/master'
+-					? `${state.remoteHead}\trefs/heads/master`
++				return rest[1] === 'refs/heads/tests'
++					? `${state.remoteHead}\trefs/heads/tests`
+ 					: state.remoteTag && `${state.remoteTag}\trefs/tags/${manifest.tag}`;
+ 			}
+ 			if (cmd === 'tag') return state.localTag ? manifest.tag : '';
+@@ -274,7 +274,7 @@ function promotionFixture() {
+ 			}
+ 			if (cmd === 'cat-file') return rest[0] === '-t' ? 'tag' : '-----BEGIN PGP SIGNATURE-----';
+ 			if (cmd === 'verify-tag' || cmd === 'status') return '';
+-			if (cmd === 'branch') return 'master';
++			if (cmd === 'branch') return 'tests';
+ 			if (cmd === 'fetch') {
+ 				state.localTag = state.remoteTag;
+ 				return '';
+@@ -471,7 +471,7 @@ test('real signed promotion survives rejected pushes and lost responses without
+ 				})
+ 			) git(cwd, 'config', name, value);
+ 		};
+-		git(root, 'init', '--quiet', '--initial-branch=master');
++		git(root, 'init', '--quiet', '--initial-branch=tests');
+ 		configure(root);
+ 		const sourceFiles = {
+ 			'action.yml': 'runs: {using: node24, main: action.mjs}\n',
+@@ -482,9 +482,9 @@ test('real signed promotion survives rejected pushes and lost responses without
+ 		git(root, 'add', '.');
+ 		git(root, 'commit', '--quiet', '-m', 'Prepared source');
+ 		const source = git(root, 'rev-parse', 'HEAD');
+-		git(root, 'init', '--quiet', '--bare', '--initial-branch=master', remote);
++		git(root, 'init', '--quiet', '--bare', '--initial-branch=tests', remote);
+ 		git(root, 'remote', 'add', 'origin', remote);
+-		git(root, 'push', '--quiet', 'origin', 'master');
++		git(root, 'push', '--quiet', 'origin', 'tests');
+ 		const directory = join(temporary, 'prepared');
+ 		const action = join(directory, 'action');
+ 		await mkdir(action, { recursive: true });
+@@ -531,12 +531,12 @@ test('real signed promotion survives rejected pushes and lost responses without
+ 		const tagObject = git(root, 'rev-parse', `refs/tags/${manifest.tag}`);
+ 		const recorded = git(root, 'rev-parse', 'HEAD');
+ 		assert.equal(git(remote, 'tag', '--list'), '');
+-		assert.equal(git(remote, 'rev-parse', 'master'), source);
++		assert.equal(git(remote, 'rev-parse', 'tests'), source);
+ 		assert.equal(publishCount, 0);
+ 		await rm(hook);
+ 		losePushResponse = true;
+ 		assert.throws(() => finalizePromotion(manifest, release(), operations(root)), /verify or resume the atomic push/);
+-		assert.equal(git(remote, 'rev-parse', 'master'), recorded);
++		assert.equal(git(remote, 'rev-parse', 'tests'), recorded);
+ 		assert.equal(git(remote, 'rev-parse', `refs/tags/${manifest.tag}`), tagObject);
+ 		assert.throws(() => finalizePromotion(manifest, release(), operations(root)), /resume draft publication/);
+ 		assert.equal(draft, true);
+@@ -551,8 +551,8 @@ test('real signed promotion survives rejected pushes and lost responses without
+ 		assert.equal(publishCount, 2);
+ 		assert.equal(git(remote, 'rev-parse', `refs/tags/${manifest.tag}`), tagObject);
+ 		assert.equal(git(remote, 'rev-parse', `${manifest.tag}^{commit}`), candidate);
+-		assert.equal(git(remote, 'rev-list', '--parents', '-n', '1', 'master'), `${recorded} ${source} ${candidate}`);
+-		assert.equal(git(remote, 'rev-parse', 'master^{tree}'), git(root, 'rev-parse', `${source}^{tree}`));
++		assert.equal(git(remote, 'rev-list', '--parents', '-n', '1', 'tests'), `${recorded} ${source} ${candidate}`);
++		assert.equal(git(remote, 'rev-parse', 'tests^{tree}'), git(root, 'rev-parse', `${source}^{tree}`));
+ 		git(resumed, 'verify-tag', manifest.tag);
+ 		for (const [name, bytes] of Object.entries({ 'action.mjs': bundle, SHA256SUMS: checksum })) {
+ 			assert.deepEqual(execFileSync('git', ['show', `${manifest.tag}:${name}`], { cwd: remote, env }), bytes);
+@@ -601,14 +601,14 @@ gh() {
+   done
+   [[ "$paginate" == true ]] || return 2
+   case "$endpoint" in
+-    repos/kjanat/actionlint/actions/workflows/release.yml/runs)
++    repos/kajaux/actionlint/actions/workflows/release.yml/runs)
+       jq -c --arg status "$status" --arg event "$event" --arg head "$head" '
+         .workflow_runs |= map(select(
+           ($status == "" or .status == $status or .conclusion == $status) and
+           ($event == "" or .event == $event) and ($head == "" or .head_sha == $head)
+         ))' <<< "$MOCK_RUN_PAGES" | jq -r "$selector"
+       ;;
+-    repos/kjanat/actionlint/actions/runs/*/jobs)
++    repos/kajaux/actionlint/actions/runs/*/jobs)
+       [[ "$MOCK_JOBS_ERROR" == false ]] || return 1
+       local run_id="\${endpoint%/jobs}"
+       run_id="\${run_id##*/}"
+@@ -672,7 +672,7 @@ for (
+ 			encoding: 'utf8',
+ 			env: {
+ 				...process.env,
+-				GITHUB_REPOSITORY: 'kjanat/actionlint',
++				GITHUB_REPOSITORY: 'kajaux/actionlint',
+ 				RELEASE_TAG: 'v1.17.1',
+ 				MOCK_COMMIT: verifiedReleaseRun.head_sha,
+ 				MOCK_PUBLISHED: String(scenario.published !== false),

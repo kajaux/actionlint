@@ -1,0 +1,4 @@
+series/001-isolate-publication.patch
+series/002-published-tests.patch
+series/003-test-branch-and-destinations.patch
+series/004-workflow-dispatch.patch

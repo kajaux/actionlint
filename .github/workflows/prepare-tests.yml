@@ -1,0 +1,117 @@
+name: Prepare tests
+on:
+  workflow_call:
+    inputs:
+      source-repository: { required: true, type: string }
+      source-ref: { required: true, type: string }
+      version: { required: true, type: string }
+
+permissions: { contents: write, actions: read }
+concurrency:
+  group: actionlint-release
+  cancel-in-progress: false
+  queue: max
+defaults: { run: { shell: "bash --noprofile --norc -euo pipefail {0}" } }
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve source and the patch revision actually executing
+        id: refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPOSITORY: ${{ inputs.source-repository }}
+          SOURCE_REF: ${{ inputs.source-ref }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "${GITHUB_REPOSITORY}" = kajaux/actionlint
+          test "${GITHUB_REF}" = refs/heads/tests
+          [[ "${SOURCE_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          test -n "${SOURCE_REF}"
+          [[ "${VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          source="$(gh api --method GET "repos/${SOURCE_REPOSITORY}/commits" -f "sha=${SOURCE_REF}" -f per_page=1 --jq '.[0].sha')"
+          patch="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --jq '[.referenced_workflows[] | select(.path == "kajaux/actionlint/.github/workflows/prepare-tests.yml@patches")] | if length == 1 then .[0].sha else error("Cannot identify executing patch revision") end')"
+          previous="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/tests" --jq .object.sha)"
+          for sha in "${source}" "${patch}" "${previous}"; do [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; done
+          printf 'source=%s\npatch=%s\nprevious=%s\n' "${source}" "${patch}" "${previous}" >> "${GITHUB_OUTPUT}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: kajaux/actionlint
+          ref: ${{ steps.refs.outputs.patch }}
+          path: patches
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ inputs.source-repository }}
+          ref: ${{ steps.refs.outputs.source }}
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with: { go-version-file: source/go.mod, cache: false }
+      - name: Apply the ordered patches
+        working-directory: source
+        env:
+          SOURCE: ${{ steps.refs.outputs.source }}
+          PATCH: ${{ steps.refs.outputs.patch }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE}"
+          test "$(git -C ../patches rev-parse HEAD)" = "${PATCH}"
+          (cd ../patches && sha256sum --check series.sha256)
+          git switch --create tests
+          git remote set-url origin https://github.com/kajaux/actionlint.git
+          while IFS= read -r patch; do
+            [[ "${patch}" =~ ^series/[0-9]{3}-[a-z-]+\.patch$ ]]
+            git apply --check --index "../patches/${patch}"
+            git apply --index "../patches/${patch}"
+          done < ../patches/series.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          epoch="$(git show -s --format=%ct "${SOURCE}")"
+          export GIT_AUTHOR_DATE="${epoch} +0000" GIT_COMMITTER_DATE="${epoch} +0000"
+          git -c commit.gpgsign=false commit -m "Apply test patches ${PATCH}"
+      - name: Prepare the requested version without publication
+        working-directory: source
+        env:
+          SOURCE: ${{ steps.refs.outputs.source }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          date="$(git show -s --format=%cs "${SOURCE}")"
+          go run ./scripts/bump-version -prepare-only -date "${date}" "${VERSION}"
+          go run ./scripts/bump-version -check
+          go test ./scripts/bump-version -run 'TestPrepareOnly|TestPreflight' -count=1
+          git add --update
+          epoch="$(git show -s --format=%ct "${SOURCE}")"
+          export GIT_AUTHOR_DATE="${epoch} +0000" GIT_COMMITTER_DATE="${epoch} +0000"
+          git -c commit.gpgsign=false commit --allow-empty -m "Prepare test source v${VERSION}"
+      - name: Record the reconstructed source
+        working-directory: source
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.source-repository }}
+          SOURCE_REF: ${{ inputs.source-ref }}
+          SOURCE: ${{ steps.refs.outputs.source }}
+          PATCH: ${{ steps.refs.outputs.patch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          jq -n --arg repository "${SOURCE_REPOSITORY}" --arg ref "${SOURCE_REF}" \
+            --arg source "${SOURCE}" --arg patches "${PATCH}" --arg version "${VERSION}" \
+            --arg date "$(git show -s --format=%cs "${SOURCE}")" \
+            --arg commit "$(git rev-parse HEAD)" --arg tree "$(git rev-parse HEAD^{tree})" \
+            '{source_repository:$repository, source_ref:$ref, source_commit:$source, patch_commit:$patches, version:$version, changelog_date:$date, commit:$commit, tree:$tree}' \
+            > "${RUNNER_TEMP}/tests-source.json"
+          cat "${RUNNER_TEMP}/tests-source.json" >> "${GITHUB_STEP_SUMMARY}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with: { name: tests-source, path: "${{ runner.temp }}/tests-source.json", if-no-files-found: error }
+      - name: Update only the generated tests branch
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS: ${{ steps.refs.outputs.previous }}
+        run: |
+          test "$(git remote get-url origin)" = https://github.com/kajaux/actionlint.git
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            -c push.followTags=false push --force-with-lease="refs/heads/tests:${PREVIOUS}" \
+            origin HEAD:refs/heads/tests

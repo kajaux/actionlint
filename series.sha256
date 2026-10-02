@@ -1,0 +1,4 @@
+07e3a29b8fc345fac17d5bf3f28070051bcba4c4e05deb3a4391a6d7ed832291  series/001-isolate-publication.patch
+c11d835bf1e156b37f120354f16ce31dc3eb45a1f80f6c99f13f79866186c8ce  series/002-published-tests.patch
+2a10667d5faa7ce29c7b81f53a4d2ccf38e3dea482cf344e5129b5b69d2a0c75  series/003-test-branch-and-destinations.patch
+594684996923f88bdf44fd3c138d300e81159621a258096f551d232612fec667  series/004-workflow-dispatch.patch

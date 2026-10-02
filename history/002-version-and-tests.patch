@@ -1,0 +1,400 @@
+diff --git a/.github/workflows/npm-release.yml b/.github/workflows/npm-release.yml
+index df63d5a0378ea336ffe811d9de60abe29258d991..6b886ec9184cc0baa228ad3ec80382466d6337bf 100644
+--- a/.github/workflows/npm-release.yml
++++ b/.github/workflows/npm-release.yml
+@@ -8,7 +8,7 @@ on:
+       dry-run: { description: Build and smoke-test without publishing, default: false, type: boolean }
+   workflow_dispatch:
+     inputs:
+-      tag: { description: "Release tag to publish (e.g. v1.17.0)", required: true, type: string }
++      tag: { description: "Release tag to publish (e.g. v1.18.0)", required: true, type: string }
+       dist-tag: {
+         description: "npm dist-tag; auto picks next for a prerelease, otherwise latest",
+         required: false,
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 47cad02b074dc22ae534108babd1e59ec241e70c..cf0830834753d36da031308714630226b82fb2b0 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -139,7 +139,7 @@ jobs:
+             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
+               --digestfile "${RUNNER_TEMP}/ghcr.io.digest" \
+               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.tar" \
+-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
++              "docker://ghcr.io/kajaux/actionlint:${tag}"
+             expected="$(cat "${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.digest")"
+             actual="$(cat "${RUNNER_TEMP}/ghcr.io.digest")"
+             test "${actual}" = "${expected}"
+@@ -163,15 +163,15 @@ jobs:
+             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
+               --digestfile "${RUNNER_TEMP}/action-image.digest" \
+               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-action-container_${VERSION}.tar" \
+-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
++              "docker://ghcr.io/kajaux/actionlint:${tag}"
+             actual="$(cat "${RUNNER_TEMP}/action-image.digest")"
+             test "${actual}" = "${expected}"
+           done
+           echo "digest=${expected}" >> "${GITHUB_OUTPUT}"
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
++        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
+       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
++        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
+   action-smoke:
+     name: Check published Action pins (${{ matrix.os }})
+     needs: verify
+@@ -193,6 +193,7 @@ jobs:
+           mkdir .published-action-test
+           sed -e "s|OWNER/REPO@RELEASE_TAG|${GITHUB_REPOSITORY}@v${VERSION}|g" \
+             -e "s|OWNER/REPO@COMMIT_SHA|${GITHUB_REPOSITORY}@${CANDIDATE}|g" \
++            -e "s|RELEASE_TAG|v${VERSION}|g" \
+             scripts/testdata/published-action/action.yml > .published-action-test/action.yml
+       - name: Resolve both published references through the runner
+         # The prepared composite contains literal external uses references.
+diff --git a/.pre-commit-hooks.yaml b/.pre-commit-hooks.yaml
+index 9f8c9f05cb66ac99d2e77e57c5d4c52e0adc021a..bd95ac48782d95b6f614613ba988f29a4f7c0869 100644
+--- a/.pre-commit-hooks.yaml
++++ b/.pre-commit-hooks.yaml
+@@ -13,7 +13,7 @@
+   language: docker_image
+   types: [yaml]
+   files: ^\.github/workflows/
+-  entry: ghcr.io/kjanat/actionlint:1.17.0
++  entry: ghcr.io/kjanat/actionlint:1.18.0
+ - id: actionlint-system
+   name: Lint GitHub Actions workflow files
+   description: Runs system-installed actionlint to lint GitHub Actions workflow files
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 17e3702dae1a55efaf7ccfa1f14451bd6dadf8da..34adbd39165ba2f3a2392e5e1a8294dc04e31da3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,10 @@
+ 
+ # Unreleased
+ 
++<a id="v1.18.0"></a>
++
++## [v1.18.0](https://github.com/kjanat/actionlint/releases/tag/v1.18.0) - 2026-10-02
++
+ - Select an exact Action binary with `version` or `version-file`, including `.tool-versions`; use `install-only` to put it and enabled optional tools on PATH without running analysis. (kjanat/actionlint#185)
+ 
+ - Unify CLI and Action JSON results, including completion status and configuration provenance. Action JSON now wraps findings in `diagnostics`; JSONL uses the same diagnostic fields as the CLI. Ship the versioned schema and TypeScript types in `@kjanat/actionlint`. See the [migration notes](docs/results.md#migration).
+@@ -18,6 +22,8 @@
+ - Rebuild the CLI with a typed invocation model, a preserved Go flag parser for root calls, and Cobra commands for `check`, config inspection, rules, doctor, completion and version. Add JSON/JSONL/SARIF/GitHub output, template and output files, opt-in summaries, configuration origins and generated four-shell completion. Style terminal help while respecting color controls, add `-V` as a version alias, align doctor output, and keep concurrent verbose/debug log records intact. Preserve legacy options, templates, default diagnostics, version output, streams and exit codes. Test both grammars, command/file collisions and output side effects. Use the same input resolution, analysis results and renderers for commands and legacy `Lint*` methods. Preserve callbacks, working-directory handling and legacy write-error behavior. Protect all consumed local inputs from report replacement and retain configuration provenance through YAML merges. Move the frontend into `internal/cli` so library and Wasm builds do not import Cobra or pflag; Go callers migrating from the former root `Command` type can use the shared analysis APIs.
+ - Add a GitHub Actions expression reference with evaluated examples for numeric parsing, coercion and workflow conditions, backed by a reproducible 85-case probe and archived measurement results. (kjanat/actionlint#171)
+ 
++[Changes][v1.18.0]
++
+ <a id="v1.17.0"></a>
+ 
+ ## [v1.17.0](https://github.com/kjanat/actionlint/releases/tag/v1.17.0) - 2026-09-13
+@@ -2557,6 +2563,7 @@ See documentation for more details:
+ 
+ <!-- comparison links -->
+ 
++[v1.18.0]: https://github.com/kjanat/actionlint/compare/v1.17.0...v1.18.0
+ [v1.17.0]: https://github.com/kjanat/actionlint/compare/v1.16.1...v1.17.0
+ [v1.16.1]: https://github.com/kjanat/actionlint/compare/v1.16.0...v1.16.1
+ [v1.16.0]: https://github.com/kjanat/actionlint/compare/v1.15.1...v1.16.0
+diff --git a/README.md b/README.md
+index 2f1635bc8d39ab357fbe169c69bab2f7ff9574bf..fd31dcb841d50d648d1cdc851c340994b508bc17 100644
+--- a/README.md
++++ b/README.md
+@@ -181,7 +181,7 @@ Workflow files can be checked on every commit with [pre-commit][pre-commit]. Add
+ ---
+ repos:
+   - repo: https://github.com/kjanat/actionlint
+-    rev: v1.17.0
++    rev: v1.18.0
+     hooks: [id: actionlint]
+ ```
+ 
+@@ -264,11 +264,11 @@ actionlint is distributed under [the MIT license].
+ 
+ <!-- versioned links -->
+ 
+-[api]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/api.md
+-[checks]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/checks.md
++[api]: https://github.com/kjanat/actionlint/blob/v1.18.0/docs/api.md
++[checks]: https://github.com/kjanat/actionlint/blob/v1.18.0/docs/checks.md
+ [install]: https://github.com/kjanat/actionlint/blob/master/docs/install.md
+-[refs]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/reference.md
+-[usage]: https://github.com/kjanat/actionlint/blob/v1.17.0/docs/usage.md
++[refs]: https://github.com/kjanat/actionlint/blob/v1.18.0/docs/reference.md
++[usage]: https://github.com/kjanat/actionlint/blob/v1.18.0/docs/usage.md
+ 
+ <!-- specific commit refs -->
+ 
+diff --git a/REHEARSAL.md b/REHEARSAL.md
+index 79e21f711802729df7192b494633c8446524ea37..d8357298267dd5dd137e5f2e3460bbe2b0af7004 100644
+--- a/REHEARSAL.md
++++ b/REHEARSAL.md
+@@ -7,6 +7,7 @@ Exercise signed immutable GitHub releases, the published Action on Linux/macOS/W
+ npm packages through GitHub Packages, and CLI/Action containers through GHCR.
+ No npmjs, Docker Hub, Homebrew, Scoop, AUR, or WinGet publication. Nix checks excluded.
+ 
+-The rehearsal uses version `1.17.0` in this fork's independent release namespace.
++The rehearsal uses version `1.18.0` in this repository's independent release namespace.
++Container images publish to `ghcr.io/kajaux/actionlint`.
+ It does not move any production tags or publish any production packages.
+ GitHub Packages publication does not exercise npmjs trusted publishing.
+diff --git a/distribution/aur/actionlint-kjanat-git/PKGBUILD b/distribution/aur/actionlint-kjanat-git/PKGBUILD
+index 985931877ab4ee24fb20b90b12c477bdf0417dad..d50624d3244bc32e6986469d96398ec91217bb70 100644
+--- a/distribution/aur/actionlint-kjanat-git/PKGBUILD
++++ b/distribution/aur/actionlint-kjanat-git/PKGBUILD
+@@ -3,7 +3,7 @@
+ # VCS package: builds the tip of master. pkgver() derives the version from
+ # git describe at build time; the value below only feeds the AUR web page.
+ pkgname=actionlint-kjanat-git
+-pkgver=1.17.0.r0.g0000000
++pkgver=1.18.0.r0.g0000000
+ pkgrel=1
+ pkgdesc='Static checker for GitHub Actions workflow files (kjanat fork, git master)'
+ arch=('x86_64' 'aarch64' 'armv7h')
+@@ -25,7 +25,7 @@ _module='actionlint.kjanat.dev'
+ 
+ pkgver() {
+ 	cd actionlint
+-	# v1.17.0-12-gabc1234 -> 1.17.0.r12.gabc1234
++	# v1.18.0-12-gabc1234 -> 1.18.0.r12.gabc1234
+ 	git describe --long --abbrev=7 --tags | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+ }
+ 
+diff --git a/distribution/npm/README.md b/distribution/npm/README.md
+index ba2348a04afad8b34171914f430d0005ecc5df97..2126b4121dd516905f724ae9e684c546f6feac77 100644
+--- a/distribution/npm/README.md
++++ b/distribution/npm/README.md
+@@ -54,7 +54,7 @@ or a swapped asset fails the build.
+ cd .github/actions/npm-packages
+ GITHUB_WORKSPACE="$(git rev-parse --show-toplevel)" \
+   INPUT_REPOSITORY=kjanat/actionlint \
+-  INPUT_VERSION=1.17.0 \
++  INPUT_VERSION=1.18.0 \
+   go run .
+ ```
+ 
+diff --git a/docs/install.md b/docs/install.md
+index 2c5b4485fc2cc27b61e0b2e0aff966826b98c742..de508d3411dc60bdd7bfcfa7c316258dfa95a920 100644
+--- a/docs/install.md
++++ b/docs/install.md
+@@ -122,15 +122,15 @@ The release matrix builds all these targets, but native CI tests do not cover:
+ To install these binaries [`gh`][gh] command is useful. The following command is an example for x86_64 Linux.
+ 
+ ```sh
+-gh release download --repo kjanat/actionlint --pattern '*_linux_amd64.tar.gz' v1.17.0
+-tar xf actionlint_1.17.0_linux_amd64.tar.gz
++gh release download --repo kjanat/actionlint --pattern '*_linux_amd64.tar.gz' v1.18.0
++tar xf actionlint_1.18.0_linux_amd64.tar.gz
+ ./actionlint -version
+ ```
+ 
+ Verify the downloaded archive's [build provenance attestation][attestations] against this repository:
+ 
+ ```sh
+-gh attestation verify -R kjanat/actionlint actionlint_1.17.0_linux_amd64.tar.gz
++gh attestation verify -R kjanat/actionlint actionlint_1.18.0_linux_amd64.tar.gz
+ ```
+ 
+ <a id="download-script"></a>
+@@ -149,10 +149,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6b
+ ```
+ 
+ When you need to install specific version of actionlint, please give the version to the 1st command line argument. The following
+-example installs v1.17.0.
++example installs v1.18.0.
+ 
+ ```sh
+-bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
++bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.0
+ ```
+ 
+ This script downloads `actionlint` (or `actionlint.exe` on Windows) binary to the current working directory. When you need to put
+diff --git a/docs/usage.md b/docs/usage.md
+index bb65baa936953b5ebac38b58a1276b760b21c181..dbeefb76b4ab905a1c4b78e3e555a39a1b0284f9 100644
+--- a/docs/usage.md
++++ b/docs/usage.md
+@@ -561,7 +561,7 @@ jobs:
+         with: { persist-credentials: false }
+       - name: Download actionlint
+         id: get_actionlint
+-        run: bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
++        run: bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.0
+         shell: bash
+       - name: Check workflow files
+         env: { actionlint: "${{ steps.get_actionlint.outputs.executable }}" }
+@@ -574,7 +574,7 @@ Or simply download the executable and run it in one step:
+ ```yaml
+ - name: Check workflow files
+   run: |
+-    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
++    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.0
+     ./actionlint -color
+   shell: bash
+ ```
+@@ -636,7 +636,7 @@ Available tags are:
+   Moving alias for the latest stable version of actionlint. This image is recommended.
+ - `ghcr.io/kjanat/actionlint:{version}`:\
+   Release-specific actionlint image rather than a moving alias.\
+-  (e.g. `ghcr.io/kjanat/actionlint:1.17.0`)
++  (e.g. `ghcr.io/kjanat/actionlint:1.18.0`)
+ 
+ The CLI image is also published to Docker Hub as `kjanat/actionlint:latest` and
+ `kjanat/actionlint:{version}`. Both registries carry the same manifest, so pick
+@@ -756,7 +756,7 @@ in the step of your workflow.
+ - name: Check workflow files
+   run: |
+     echo "::add-matcher::.github/actionlint-matcher.json"
+-    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.17.0
++    bash <(curl -fsSL https://raw.githubusercontent.com/kjanat/actionlint/662318dd6bbd9c0c120e35b03168bc1be69bf428/scripts/download-actionlint.bash) 1.18.0
+     ./actionlint -color
+   shell: bash
+ ```
+@@ -801,7 +801,7 @@ Add this to your `.pre-commit-config.yaml` in your repository:
+ ---
+ repos:
+   - repo: https://github.com/kjanat/actionlint
+-    rev: v1.17.0
++    rev: v1.18.0
+     hooks:
+       - id: actionlint
+ ```
+@@ -829,7 +829,7 @@ plain hook:
+ ---
+ repos:
+   - repo: https://github.com/kjanat/actionlint
+-    rev: v1.17.0
++    rev: v1.18.0
+     hooks:
+       - id: actionlint
+         additional_dependencies:
+@@ -924,7 +924,7 @@ trunk check enable actionlint
+ or if you'd like a specific version:
+ 
+ ```bash
+-trunk check enable actionlint@1.17.0
++trunk check enable actionlint@1.18.0
+ ```
+ 
+ or modify `.trunk/trunk.yaml` in your repository to contain:
+@@ -932,7 +932,7 @@ or modify `.trunk/trunk.yaml` in your repository to contain:
+ ```yaml
+ lint:
+   enabled:
+-    - actionlint@1.17.0
++    - actionlint@1.18.0
+ ```
+ 
+ Then just run:
+diff --git a/flake.nix b/flake.nix
+index 422023c59f2cddaccdf0e0bc12f60f44f5d6a473..8a2cf958a0412aa8be34dd95da21979fbed7152a 100644
+--- a/flake.nix
++++ b/flake.nix
+@@ -12,7 +12,7 @@
+         "aarch64-darwin"
+       ];
+       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+-      version = "1.17.0";
++      version = "1.18.0";
+     in
+     {
+       packages = forAllSystems (pkgs: rec {
+diff --git a/man/actionlint.1.md b/man/actionlint.1.md
+index 8be54920229a485a695505d729069e381117d73e..66c2f634faab0553666bcb507fa6bfc9f81a0831 100644
+--- a/man/actionlint.1.md
++++ b/man/actionlint.1.md
+@@ -2,7 +2,7 @@
+ title: actionlint
+ section: 1
+ header: General Commands Manual
+-footer: actionlint 1.17.0
++footer: actionlint 1.18.0
+ ---
+ 
+ # NAME
+@@ -524,7 +524,7 @@ Detailed documentation for this release and current installation options are ava
+ 
+ ## Checks
+ 
+-https://github.com/kjanat/actionlint/blob/v1.17.0/docs/checks.md
++https://github.com/kjanat/actionlint/blob/v1.18.0/docs/checks.md
+ 
+ Full list of all checks done by actionlint with example inputs, outputs, and playground links.
+ 
+@@ -537,26 +537,26 @@ script, Docker, and Go, plus the status of WinGet and upstream-only package name
+ 
+ ## Usage
+ 
+-https://github.com/kjanat/actionlint/blob/v1.17.0/docs/usage.md
++https://github.com/kjanat/actionlint/blob/v1.18.0/docs/usage.md
+ 
+ CLI usage, shell completion, output templates, the GitHub Action, Docker images, and editor
+ and CI integrations.
+ 
+ ## Configuration
+ 
+-https://github.com/kjanat/actionlint/blob/v1.17.0/docs/config.md
++https://github.com/kjanat/actionlint/blob/v1.18.0/docs/config.md
+ 
+ Repository configuration, runner labels, variables, secrets, and policy checks.
+ 
+ ## Go API
+ 
+-https://github.com/kjanat/actionlint/blob/v1.17.0/docs/api.md
++https://github.com/kjanat/actionlint/blob/v1.18.0/docs/api.md
+ 
+ How to use actionlint as Go library.
+ 
+ ## References
+ 
+-https://github.com/kjanat/actionlint/blob/v1.17.0/docs/reference.md
++https://github.com/kjanat/actionlint/blob/v1.18.0/docs/reference.md
+ 
+ Links to resources.
+ 
+diff --git a/scripts/download-actionlint.bash b/scripts/download-actionlint.bash
+index 4ddd905e154ca3a17e5c54ec17136d28bb7cefe3..c8247e186f86ead4b5e7967563d2730db534feea 100755
+--- a/scripts/download-actionlint.bash
++++ b/scripts/download-actionlint.bash
+@@ -43,7 +43,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+ fi
+ 
+ # Default value is updated manually on release
+-version="1.17.0"
++version="1.18.0"
+ if [[ -n "$1" ]]; then
+ 	if [[ "$1" == 'latest' || "$1" == 'LATEST' ]]; then
+ 		latest_url="$(curl --fail --silent --show-error --location --head --output /dev/null --write-out '%{url_effective}' https://github.com/kjanat/actionlint/releases/latest)"
+diff --git a/scripts/testdata/published-action/action.yml b/scripts/testdata/published-action/action.yml
+index c76486b344410b3eb5704908ba0a01d9f96d9830..e32469cfdc91aab1b48b8cdcd10407e9a91db697 100644
+--- a/scripts/testdata/published-action/action.yml
++++ b/scripts/testdata/published-action/action.yml
+@@ -3,6 +3,29 @@ description: Run the published version and commit through the runner and verify
+ runs:
+   using: composite
+   steps:
++    - name: Write version selection file
++      shell: bash
++      env: { EXPECTED_TAG: RELEASE_TAG }
++      run: echo "actionlint ${EXPECTED_TAG#v}" > .rehearsal-tool-versions
++    - id: install
++      uses: OWNER/REPO@RELEASE_TAG
++      env: { ACTIONLINT_ACTION_BINARY: "" }
++      with: { version: RELEASE_TAG, install-only: "true", shellcheck: "false", pyflakes: "false" }
++    - name: Exercise installed binary from PATH
++      shell: bash
++      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.install.outputs.version }}" }
++      run: |
++        test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
++        actionlint -version | head -1 | grep -F "${EXPECTED_VERSION#v}"
++        actionlint check --no-config --shellcheck= --pyflakes= testdata/ok/minimal.yaml
++    - id: version_file
++      uses: OWNER/REPO@RELEASE_TAG
++      env: { ACTIONLINT_ACTION_BINARY: "" }
++      with: { version-file: .rehearsal-tool-versions, install-only: "true", shellcheck: "false", pyflakes: "false" }
++    - name: Verify version file selection
++      shell: bash
++      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.version_file.outputs.version }}" }
++      run: test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
+     - id: version
+       uses: OWNER/REPO@RELEASE_TAG
+       env: { ACTIONLINT_ACTION_BINARY: "" }

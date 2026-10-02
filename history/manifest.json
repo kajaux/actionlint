@@ -1,0 +1,18 @@
+{
+  "source_repository": "kjanat/actionlint",
+  "source_commit": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0",
+  "source_tree": "c78c1195bdb250a0ccf5fd8b8dc2b169be854675",
+  "changes": [
+    {
+      "patch": "001-isolate-publication.patch",
+      "commit": "c80c2f280fbe6b3b850991463461007c10cfb2a0",
+      "tree": "0994bb162453fd5e2accafabda455a315513e416"
+    },
+    {
+      "patch": "002-version-and-tests.patch",
+      "commit": "68ce4dfc550efb9a52ec61a06adcbfb58f754e65",
+      "tree": "05b8ca9ee3848f4e3742c080f3f2e61f8c84bd18"
+    }
+  ],
+  "preserved_execution_commit": "2dc175d267cb7bc7d28d93be3d50584e3000e938"
+}
