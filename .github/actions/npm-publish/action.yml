@@ -1,5 +1,5 @@
 name: Publish an npm tarball
-description: Publish one packed tarball through npm trusted publishing and report where it landed
+description: Publish one tested tarball to the isolated rehearsal's GitHub Packages registry
 inputs:
   tarball:
     description: Path to the .tgz to publish
@@ -50,7 +50,17 @@ runs:
         name="$(jq -er .name <<<"${manifest}")"
         version="$(jq -er .version <<<"${manifest}")"
 
-        args=(--access public --tag "${DIST_TAG}")
+        # Fork-only boundary: neither production names nor npmjs can be written.
+        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint-release-rehearsal' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
+          echo '::error::Publishing is restricted to the isolated rehearsal repository and GitHub Packages.'
+          exit 1
+        fi
+        case "${name}" in
+        @kajaux/actionlint-rehearsal | @kajaux/actionlint-*) ;;
+        *) echo "::error::Unexpected rehearsal package ${name}"; exit 1 ;;
+        esac
+        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint-release-rehearsal.git"' <<<"${manifest}"
+        args=(--registry "${REGISTRY}" --tag "${DIST_TAG}")
         if [[ "${DRY_RUN}" == 'true' ]]; then
           # Allow testing existing releases; --dry-run still prevents uploads.
           args+=(--dry-run --force)
@@ -60,5 +70,5 @@ runs:
         {
           echo "name=${name}"
           echo "version=${version}"
-          echo "url=https://npm.im/package/${name}/v/${version}"
+          echo "url=https://github.com/kajaux/actionlint-release-rehearsal/packages"
         } >> "${GITHUB_OUTPUT}"

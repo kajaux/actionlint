@@ -85,10 +85,6 @@ jobs:
           cp "${RUNNER_TEMP}/release-notes.md" "${RUNNER_TEMP}/actionlint-action/release-notes.md"
       - uses: &Upload actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with: { name: prepared-release, path: "${{ runner.temp }}/actionlint-action", if-no-files-found: error }
-  nix:
-    needs: prepare
-    uses: $/.github/workflows/nix.yml
-    with: { tag: "v${{ inputs.version }}" }
   action:
     name: Candidate Action (${{ matrix.os }})
     needs: prepare
@@ -236,7 +232,7 @@ jobs:
           compression-level: 0
   draft:
     name: Store the validated release draft
-    needs: [prepare, nix, action, container]
+    needs: [prepare, action, container]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions: { contents: write }

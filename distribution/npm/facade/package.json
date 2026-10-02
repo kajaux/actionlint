@@ -1,5 +1,5 @@
 {
-  "name": "@kjanat/actionlint",
+  "name": "@kajaux/actionlint-rehearsal",
   "version": "0.0.0",
   "description": "Static checker for GitHub Actions workflow files",
   "keywords": [
@@ -13,13 +13,13 @@
     "yaml",
     "shellcheck"
   ],
-  "homepage": "https://actionlint.kjanat.dev",
+  "homepage": "https://github.com/kajaux/actionlint-release-rehearsal",
   "bugs": {
-    "url": "https://github.com/kjanat/actionlint/issues"
+    "url": "https://github.com/kajaux/actionlint-release-rehearsal/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kjanat/actionlint.git"
+    "url": "git+https://github.com/kajaux/actionlint-release-rehearsal.git"
   },
   "funding": {
     "type": "github",
