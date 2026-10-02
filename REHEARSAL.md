@@ -7,6 +7,7 @@ Exercise signed immutable GitHub releases, the published Action on Linux/macOS/W
 npm packages through GitHub Packages, and CLI/Action containers through GHCR.
 No npmjs, Docker Hub, Homebrew, Scoop, AUR, or WinGet publication. Nix checks excluded.
 
-The rehearsal uses version `1.17.0` in this fork's independent release namespace.
+The rehearsal uses version `1.18.0` in this repository's independent release namespace.
+Container images publish to `ghcr.io/kajaux/actionlint`.
 It does not move any production tags or publish any production packages.
 GitHub Packages publication does not exercise npmjs trusted publishing.

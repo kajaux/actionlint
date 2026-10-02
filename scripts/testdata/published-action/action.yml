@@ -3,6 +3,29 @@ description: Run the published version and commit through the runner and verify 
 runs:
   using: composite
   steps:
+    - name: Write version selection file
+      shell: bash
+      env: { EXPECTED_TAG: RELEASE_TAG }
+      run: echo "actionlint ${EXPECTED_TAG#v}" > .rehearsal-tool-versions
+    - id: install
+      uses: OWNER/REPO@RELEASE_TAG
+      env: { ACTIONLINT_ACTION_BINARY: "" }
+      with: { version: RELEASE_TAG, install-only: "true", shellcheck: "false", pyflakes: "false" }
+    - name: Exercise installed binary from PATH
+      shell: bash
+      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.install.outputs.version }}" }
+      run: |
+        test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
+        actionlint -version | head -1 | grep -F "${EXPECTED_VERSION#v}"
+        actionlint check --no-config --shellcheck= --pyflakes= testdata/ok/minimal.yaml
+    - id: version_file
+      uses: OWNER/REPO@RELEASE_TAG
+      env: { ACTIONLINT_ACTION_BINARY: "" }
+      with: { version-file: .rehearsal-tool-versions, install-only: "true", shellcheck: "false", pyflakes: "false" }
+    - name: Verify version file selection
+      shell: bash
+      env: { EXPECTED_VERSION: RELEASE_TAG, INSTALLED_VERSION: "${{ steps.version_file.outputs.version }}" }
+      run: test "${INSTALLED_VERSION}" = "${EXPECTED_VERSION#v}"
     - id: version
       uses: OWNER/REPO@RELEASE_TAG
       env: { ACTIONLINT_ACTION_BINARY: "" }

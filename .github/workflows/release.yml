@@ -139,7 +139,7 @@ jobs:
             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
               --digestfile "${RUNNER_TEMP}/ghcr.io.digest" \
               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.tar" \
-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+              "docker://ghcr.io/kajaux/actionlint:${tag}"
             expected="$(cat "${RUNNER_TEMP}/release-assets/actionlint-container_${VERSION}.digest")"
             actual="$(cat "${RUNNER_TEMP}/ghcr.io.digest")"
             test "${actual}" = "${expected}"
@@ -163,15 +163,15 @@ jobs:
             skopeo copy --all --preserve-digests --authfile "${HOME}/.docker/config.json" \
               --digestfile "${RUNNER_TEMP}/action-image.digest" \
               "oci-archive:${RUNNER_TEMP}/release-assets/actionlint-action-container_${VERSION}.tar" \
-              "docker://ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+              "docker://ghcr.io/kajaux/actionlint:${tag}"
             actual="$(cat "${RUNNER_TEMP}/action-image.digest")"
             test "${actual}" = "${expected}"
           done
           echo "digest=${expected}" >> "${GITHUB_OUTPUT}"
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
+        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.image.outputs.digest }}", push-to-registry: true }
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
-        with: { subject-name: "ghcr.io/${{ github.repository }}", subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
+        with: { subject-name: ghcr.io/kajaux/actionlint, subject-digest: "${{ steps.action-image.outputs.digest }}", push-to-registry: true }
   action-smoke:
     name: Check published Action pins (${{ matrix.os }})
     needs: verify
@@ -193,6 +193,7 @@ jobs:
           mkdir .published-action-test
           sed -e "s|OWNER/REPO@RELEASE_TAG|${GITHUB_REPOSITORY}@v${VERSION}|g" \
             -e "s|OWNER/REPO@COMMIT_SHA|${GITHUB_REPOSITORY}@${CANDIDATE}|g" \
+            -e "s|RELEASE_TAG|v${VERSION}|g" \
             scripts/testdata/published-action/action.yml > .published-action-test/action.yml
       - name: Resolve both published references through the runner
         # The prepared composite contains literal external uses references.
