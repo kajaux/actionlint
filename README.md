@@ -41,11 +41,11 @@ preparation script is required.
 
 ## Review and maintain patches
 
-- `001`: existing publication isolation; no npmjs, Docker Hub, Homebrew, Scoop,
-  AUR, WinGet, or Nix execution.
+- `001`: publication isolation targeting `kajaux/actionlint` directly; no npmjs,
+  Docker Hub, Homebrew, Scoop, AUR, WinGet, or Nix execution.
 - `002`: existing additional published Action tests and GHCR destination fix.
-- `003`: renamed destinations, `tests` branch assumptions, deterministic
-  preparation-only version mode, and matching helper tests.
+- `003`: `tests` branch assumptions, deterministic preparation-only version mode,
+  and matching helper tests.
 - `004`: thin workflow-dispatch caller on the generated branch.
 
 Publication is restricted to `kajaux/actionlint`, GitHub Packages (`@kajaux`),

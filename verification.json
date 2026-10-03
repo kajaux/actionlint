@@ -10,7 +10,7 @@
     }
   ],
   "source_commit": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0",
-  "active_series_sha256": "ee04bea0ecb71deee604921a7f99a6f5b6e8ca3c1c47f347785a265485897a3d",
+  "active_series_sha256": "1ada65035d5e0350294b62aa0add03a898d4abdc91039ba2abff6251facb0e1e",
   "version": "1.18.1",
   "changelog_date": "2026-10-02",
   "active_replay_trees": [
@@ -19,5 +19,13 @@
   ],
   "conflict_rejected": true,
   "remote_tests_unchanged_on_conflict": true,
-  "release_runs_started": false
+  "release_runs_started": false,
+  "normalized_series_replay_before_version_bump": {
+    "trees": [
+      "41f16ba8fd08755c5e48c787e4886179d26df78b",
+      "41f16ba8fd08755c5e48c787e4886179d26df78b"
+    ],
+    "unchanged_from_previous_series": true,
+    "obsolete_repository_references": 0
+  }
 }

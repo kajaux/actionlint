@@ -1,5 +1,5 @@
 diff --git a/.github/actions/npm-publish/action.yml b/.github/actions/npm-publish/action.yml
-index e8c7777b6e47076733a01b8d0012dd684b7524ea..bf38a6ce595e9ffc78973e7c6b9af570c4f74996 100644
+index e8c7777b6e47076733a01b8d0012dd684b7524ea..1a0767c7d4fdf8c765cb528536546661c865a36c 100644
 --- a/.github/actions/npm-publish/action.yml
 +++ b/.github/actions/npm-publish/action.yml
 @@ -1,5 +1,5 @@
@@ -15,7 +15,7 @@ index e8c7777b6e47076733a01b8d0012dd684b7524ea..bf38a6ce595e9ffc78973e7c6b9af570
  
 -        args=(--access public --tag "${DIST_TAG}")
 +        # Fork-only boundary: neither production names nor npmjs can be written.
-+        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint-release-rehearsal' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
++        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
 +          echo '::error::Publishing is restricted to the isolated rehearsal repository and GitHub Packages.'
 +          exit 1
 +        fi
@@ -23,7 +23,7 @@ index e8c7777b6e47076733a01b8d0012dd684b7524ea..bf38a6ce595e9ffc78973e7c6b9af570
 +        @kajaux/actionlint-rehearsal | @kajaux/actionlint-*) ;;
 +        *) echo "::error::Unexpected rehearsal package ${name}"; exit 1 ;;
 +        esac
-+        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint-release-rehearsal.git"' <<<"${manifest}"
++        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint.git"' <<<"${manifest}"
 +        args=(--registry "${REGISTRY}" --tag "${DIST_TAG}")
          if [[ "${DRY_RUN}" == 'true' ]]; then
            # Allow testing existing releases; --dry-run still prevents uploads.
@@ -33,10 +33,10 @@ index e8c7777b6e47076733a01b8d0012dd684b7524ea..bf38a6ce595e9ffc78973e7c6b9af570
            echo "name=${name}"
            echo "version=${version}"
 -          echo "url=https://npm.im/package/${name}/v/${version}"
-+          echo "url=https://github.com/kajaux/actionlint-release-rehearsal/packages"
++          echo "url=https://github.com/kajaux/actionlint/packages"
          } >> "${GITHUB_OUTPUT}"
 diff --git a/.github/workflows/npm-release.yml b/.github/workflows/npm-release.yml
-index 50de9decdcd472ae3905acd94ded48b4893f0e81..df63d5a0378ea336ffe811d9de60abe29258d991 100644
+index 50de9decdcd472ae3905acd94ded48b4893f0e81..a44084a9e7e19134485c453c0cc36279c65ea5f6 100644
 --- a/.github/workflows/npm-release.yml
 +++ b/.github/workflows/npm-release.yml
 @@ -28,7 +28,7 @@ concurrency:
@@ -53,7 +53,7 @@ index 50de9decdcd472ae3905acd94ded48b4893f0e81..df63d5a0378ea336ffe811d9de60abe2
        node: ${{ steps.node.outputs.version }}
      steps:
 +      - name: Require the isolated rehearsal repository
-+        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint-release-rehearsal'
++        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint'
        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
          with: { ref: "${{ case(inputs.dry-run, github.sha, format('refs/tags/{0}', env.RELEASE_TAG)) }}", persist-credentials: false }
        # Manual recovery requires verified release bytes even if a later publishing job failed.
@@ -333,7 +333,7 @@ index 6288779bef7e2a2cbb70a11f203993fd8004a572..47cad02b074dc22ae534108babd1e59e
      timeout-minutes: 10
      permissions: { contents: write }
 diff --git a/.goreleaser.yaml b/.goreleaser.yaml
-index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca06437cae 100644
+index 6b68d35a6f6b9f0f90196027afd3d68615e77080..62cc09456ed301f7cff51c738843cacd672a756b 100644
 --- a/.goreleaser.yaml
 +++ b/.goreleaser.yaml
 @@ -1,6 +1,7 @@
@@ -350,8 +350,8 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      url:
 -      template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
 -      verified: github.com/kjanat/actionlint/
-+      template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-+      verified: github.com/kajaux/actionlint-release-rehearsal/
++      template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++      verified: github.com/kajaux/actionlint/
      commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
      homepage: https://actionlint.kjanat.dev
      description: Static checker for GitHub Actions workflow files
@@ -360,7 +360,7 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      directory: bucket
      goamd64: v1
 -    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-+    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
      commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
      homepage: https://actionlint.kjanat.dev
      description: Static checker for GitHub Actions workflow files
@@ -369,7 +369,7 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      publisher: kjanat
      publisher_url: https://github.com/kjanat
 -    publisher_support_url: https://github.com/kjanat/actionlint/issues
-+    publisher_support_url: https://github.com/kajaux/actionlint-release-rehearsal/issues
++    publisher_support_url: https://github.com/kajaux/actionlint/issues
      author: Kaj Kowalski
      homepage: https://actionlint.kjanat.dev
      short_description: Static checker for GitHub Actions workflow files
@@ -378,13 +378,13 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
        runs. This is the kjanat fork.
      license: MIT
 -    license_url: "https://github.com/kjanat/actionlint/blob/{{ .Tag }}/LICENSE.txt"
-+    license_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
++    license_url: "https://github.com/kajaux/actionlint/blob/{{ .Tag }}/LICENSE.txt"
      copyright: Copyright (c) 2026 Kaj Kowalski, Copyright (c) 2021 rhysd
 -    copyright_url: "https://github.com/kjanat/actionlint/blob/{{ .Tag }}/LICENSE.txt"
-+    copyright_url: "https://github.com/kajaux/actionlint-release-rehearsal/blob/{{ .Tag }}/LICENSE.txt"
++    copyright_url: "https://github.com/kajaux/actionlint/blob/{{ .Tag }}/LICENSE.txt"
      release_notes: "{{ .Changelog }}"
 -    release_notes_url: "https://github.com/kjanat/actionlint/releases/tag/{{ .Tag }}"
-+    release_notes_url: "https://github.com/kajaux/actionlint-release-rehearsal/releases/tag/{{ .Tag }}"
++    release_notes_url: "https://github.com/kajaux/actionlint/releases/tag/{{ .Tag }}"
      installation_notes: >-
        ShellCheck and pyflakes are optional; when installed, actionlint can use them
        to check shell and Python scripts in workflow run steps.
@@ -392,7 +392,7 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      ids: [windows]
      goamd64: v1
 -    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-+    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
      commit_msg_template: "New version: {{ .PackageIdentifier }} {{ .Version }}"
      # Resume uploads after microsoft/winget-pkgs#430563 is merged.
      skip_upload: true
@@ -401,7 +401,7 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      license: MIT
      rel: "1"
 -    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-+    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
      private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
      git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat-bin.git
      commit_msg_template: "Update to {{ .Tag }}"
@@ -410,12 +410,12 @@ index 6b68d35a6f6b9f0f90196027afd3d68615e77080..6036169a51af7d0b33f77527b93580ca
      license: MIT
      rel: "1"
 -    url_template: "https://github.com/kjanat/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-+    url_template: "https://github.com/kajaux/actionlint-release-rehearsal/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
++    url_template: "https://github.com/kajaux/actionlint/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
      private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
      git_url: ssh://aur@aur.archlinux.org/actionlint-kjanat.git
      commit_msg_template: "Update to {{ .Tag }}"
 diff --git a/Dockerfile b/Dockerfile
-index c6b1325b197298809b31f1d5354a6c87ad0168c1..1e574135db82b1e2a93123a920adf3ec03dbfb5e 100644
+index c6b1325b197298809b31f1d5354a6c87ad0168c1..41229fad58fc81d1fde16fa0f84939b470863df2 100644
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -13,7 +13,7 @@ RUN go build -v -ldflags "-s -w -X actionlint.kjanat.dev.version=${ACTIONLINT_VE
@@ -423,12 +423,12 @@ index c6b1325b197298809b31f1d5354a6c87ad0168c1..1e574135db82b1e2a93123a920adf3ec
  
  FROM alpine:${ALPINE_VER} AS runtime
 -LABEL org.opencontainers.image.source="https://github.com/kjanat/actionlint"
-+LABEL org.opencontainers.image.source="https://github.com/kajaux/actionlint-release-rehearsal"
++LABEL org.opencontainers.image.source="https://github.com/kajaux/actionlint"
  LABEL org.opencontainers.image.licenses="MIT"
  RUN apk add --no-cache python3 py3-pyflakes
  COPY --from=builder /go/src/app/actionlint /usr/local/bin/
 diff --git a/distribution/npm/facade/package.json b/distribution/npm/facade/package.json
-index 3c791a2a0fdd6988da40977eb096df25fbe997f5..41e292a8131833dabee591c70e14b3fc0e9e5e88 100644
+index 3c791a2a0fdd6988da40977eb096df25fbe997f5..16758f833c07a77d9f7bd35762ebac94dd432a89 100644
 --- a/distribution/npm/facade/package.json
 +++ b/distribution/npm/facade/package.json
 @@ -1,5 +1,5 @@
@@ -443,15 +443,15 @@ index 3c791a2a0fdd6988da40977eb096df25fbe997f5..41e292a8131833dabee591c70e14b3fc
      "shellcheck"
    ],
 -  "homepage": "https://actionlint.kjanat.dev",
-+  "homepage": "https://github.com/kajaux/actionlint-release-rehearsal",
++  "homepage": "https://github.com/kajaux/actionlint",
    "bugs": {
 -    "url": "https://github.com/kjanat/actionlint/issues"
-+    "url": "https://github.com/kajaux/actionlint-release-rehearsal/issues"
++    "url": "https://github.com/kajaux/actionlint/issues"
    },
    "repository": {
      "type": "git",
 -    "url": "git+https://github.com/kjanat/actionlint.git"
-+    "url": "git+https://github.com/kajaux/actionlint-release-rehearsal.git"
++    "url": "git+https://github.com/kajaux/actionlint.git"
    },
    "funding": {
      "type": "github",
@@ -527,7 +527,7 @@ index bedbbf3c001519a76375fa37b71f11fa4d861452..59b983401e699293f547896cba071c32
        "link": true
      },
 diff --git a/packages/github-action/src/tools.ts b/packages/github-action/src/tools.ts
-index 67e14a2ad1be8d87f2b182991b0bb135a1417855..3653d47eeffb79b6f3e68c1c639cbd037b35a806 100644
+index 67e14a2ad1be8d87f2b182991b0bb135a1417855..9a94bff07ad06ec52bdca3294b81bee4dd9c48f3 100644
 --- a/packages/github-action/src/tools.ts
 +++ b/packages/github-action/src/tools.ts
 @@ -59,7 +59,7 @@ export async function nativeBinary(version: string, platform: RunnerPlatform, di
@@ -535,7 +535,7 @@ index 67e14a2ad1be8d87f2b182991b0bb135a1417855..3653d47eeffb79b6f3e68c1c639cbd03
  	console.log(`Downloading actionlint ${version} (${platform.os}/${platform.arch})`);
  	const name = nativeAssetName(version, platform);
 -	const base = `https://github.com/kjanat/actionlint/releases/download/v${version}`;
-+	const base = `https://github.com/kajaux/actionlint-release-rehearsal/releases/download/v${version}`;
++	const base = `https://github.com/kajaux/actionlint/releases/download/v${version}`;
  	const checksums = await download(
  		`${base}/actionlint_${version}_checksums.txt`,
  		join(directory, 'checksums.txt'),
