@@ -1,9 +1,9 @@
 diff --git a/.github/workflows/prepare-tests.yml b/.github/workflows/prepare-tests.yml
 new file mode 100644
-index 0000000000000000000000000000000000000000..56ce98ea5e95b940e989c63dace5d2271033c32b
+index 0000000000000000000000000000000000000000..64a3a5cb9b98d212187d489cd57345b1bfec85a5
 --- /dev/null
 +++ b/.github/workflows/prepare-tests.yml
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,17 @@
 +name: Prepare tests
 +on:
 +  workflow_dispatch:
@@ -11,7 +11,7 @@ index 0000000000000000000000000000000000000000..56ce98ea5e95b940e989c63dace5d227
 +      source-repository: { description: Source repository, required: true, default: kjanat/actionlint, type: string }
 +      source-ref: { description: "Source branch, tag or commit", required: true, type: string }
 +      version: { description: Unused stable release version, required: true, type: string }
-+permissions: { contents: write, actions: read }
++permissions: { contents: read, actions: read }
 +jobs:
 +  prepare:
 +    uses: kajaux/actionlint/.github/workflows/prepare-tests.yml@patches
@@ -19,3 +19,5 @@ index 0000000000000000000000000000000000000000..56ce98ea5e95b940e989c63dace5d227
 +      source-repository: ${{ inputs.source-repository }}
 +      source-ref: ${{ inputs.source-ref }}
 +      version: ${{ inputs.version }}
++    secrets:
++      TOKTOK: ${{ secrets.TOKTOK }}

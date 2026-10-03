@@ -5,8 +5,10 @@ on:
       source-repository: { required: true, type: string }
       source-ref: { required: true, type: string }
       version: { required: true, type: string }
+    secrets:
+      TOKTOK: { required: true }
 
-permissions: { contents: write, actions: read }
+permissions: { contents: read, actions: read }
 concurrency:
   group: actionlint-release
   cancel-in-progress: false
@@ -108,7 +110,7 @@ jobs:
       - name: Update only the generated tests branch
         working-directory: source
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.TOKTOK }}
           PREVIOUS: ${{ steps.refs.outputs.previous }}
         run: |
           test "$(git remote get-url origin)" = https://github.com/kajaux/actionlint.git

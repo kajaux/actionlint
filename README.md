@@ -39,10 +39,10 @@ The final push updates only `tests`, with a lease against the head observed at
 the start. It does not create a tag, draft, release, or package. No standalone
 preparation script is required.
 
-GitHub can reject `GITHUB_TOKEN` pushes that introduce changed workflow files.
-That failure leaves `tests` unchanged; it requires a workflow-capable credential
-before the run can publish those changes. A successful push with unchanged
-workflow content does not establish that permission.
+Create the `TOKTOK` Actions secret with a fine-grained token restricted to this
+repository, granting Contents and Workflows write access. The caller passes it
+explicitly; only the final push step uses it. Checkouts and metadata reads use
+the read-only built-in token.
 
 [Verification](verification.json) records the exact source and patch revisions,
 matching branch SHAs, historical trees, successful generation, and an intentional

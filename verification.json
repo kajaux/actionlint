@@ -86,5 +86,14 @@
   },
   "automation_limitations": [
     "GITHUB_TOKEN rejects pushes introducing workflow-file changes; the successful generated push retained existing workflow content."
-  ]
+  ],
+  "token_integration": {
+    "secret": "TOKTOK",
+    "series_sha256": "642b890256e8335345c75f2fc69438f677e0e603f1e779a355067906390d1a1d",
+    "pre_version_replay_trees": [
+      "94db9e45d12063258992cbb2e1bc4ef25b60278c",
+      "94db9e45d12063258992cbb2e1bc4ef25b60278c"
+    ],
+    "remote_push": "pending"
+  }
 }
