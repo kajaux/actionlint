@@ -1,11 +1,11 @@
 diff --git a/.github/actions/npm-publish/action.yml b/.github/actions/npm-publish/action.yml
-index e8c7777b6e47076733a01b8d0012dd684b7524ea..1a0767c7d4fdf8c765cb528536546661c865a36c 100644
+index e8c7777b6e47076733a01b8d0012dd684b7524ea..0a90c64ce46e5cf5cd18955d7e3988c431453402 100644
 --- a/.github/actions/npm-publish/action.yml
 +++ b/.github/actions/npm-publish/action.yml
 @@ -1,5 +1,5 @@
  name: Publish an npm tarball
 -description: Publish one packed tarball through npm trusted publishing and report where it landed
-+description: Publish one tested tarball to the isolated rehearsal's GitHub Packages registry
++description: Publish one tested tarball to the test repository's GitHub Packages registry
  inputs:
    tarball:
      description: Path to the .tgz to publish
@@ -16,12 +16,12 @@ index e8c7777b6e47076733a01b8d0012dd684b7524ea..1a0767c7d4fdf8c765cb528536546661
 -        args=(--access public --tag "${DIST_TAG}")
 +        # Fork-only boundary: neither production names nor npmjs can be written.
 +        if [[ "${GITHUB_REPOSITORY}" != 'kajaux/actionlint' || "${REGISTRY}" != 'https://npm.pkg.github.com/' ]]; then
-+          echo '::error::Publishing is restricted to the isolated rehearsal repository and GitHub Packages.'
++          echo '::error::Publishing is restricted to the test repository and GitHub Packages.'
 +          exit 1
 +        fi
 +        case "${name}" in
-+        @kajaux/actionlint-rehearsal | @kajaux/actionlint-*) ;;
-+        *) echo "::error::Unexpected rehearsal package ${name}"; exit 1 ;;
++        @kajaux/actionlint | @kajaux/actionlint-*) ;;
++        *) echo "::error::Unexpected test package ${name}"; exit 1 ;;
 +        esac
 +        jq -e '.repository.url == "git+https://github.com/kajaux/actionlint.git"' <<<"${manifest}"
 +        args=(--registry "${REGISTRY}" --tag "${DIST_TAG}")
@@ -36,7 +36,7 @@ index e8c7777b6e47076733a01b8d0012dd684b7524ea..1a0767c7d4fdf8c765cb528536546661
 +          echo "url=https://github.com/kajaux/actionlint/packages"
          } >> "${GITHUB_OUTPUT}"
 diff --git a/.github/workflows/npm-release.yml b/.github/workflows/npm-release.yml
-index 50de9decdcd472ae3905acd94ded48b4893f0e81..a44084a9e7e19134485c453c0cc36279c65ea5f6 100644
+index 50de9decdcd472ae3905acd94ded48b4893f0e81..90401d9c72133ed1acd821cad71ec37c9ed470ea 100644
 --- a/.github/workflows/npm-release.yml
 +++ b/.github/workflows/npm-release.yml
 @@ -28,7 +28,7 @@ concurrency:
@@ -52,7 +52,7 @@ index 50de9decdcd472ae3905acd94ded48b4893f0e81..a44084a9e7e19134485c453c0cc36279
        platforms: ${{ steps.pack.outputs.platforms }}
        node: ${{ steps.node.outputs.version }}
      steps:
-+      - name: Require the isolated rehearsal repository
++      - name: Require the test repository
 +        run: test "${GITHUB_REPOSITORY}" = 'kajaux/actionlint'
        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
          with: { ref: "${{ case(inputs.dry-run, github.sha, format('refs/tags/{0}', env.RELEASE_TAG)) }}", persist-credentials: false }
@@ -428,13 +428,13 @@ index c6b1325b197298809b31f1d5354a6c87ad0168c1..41229fad58fc81d1fde16fa0f84939b4
  RUN apk add --no-cache python3 py3-pyflakes
  COPY --from=builder /go/src/app/actionlint /usr/local/bin/
 diff --git a/distribution/npm/facade/package.json b/distribution/npm/facade/package.json
-index 3c791a2a0fdd6988da40977eb096df25fbe997f5..16758f833c07a77d9f7bd35762ebac94dd432a89 100644
+index 3c791a2a0fdd6988da40977eb096df25fbe997f5..9f9695667a86e1e6a432a5a4e5b9bd06d21338fe 100644
 --- a/distribution/npm/facade/package.json
 +++ b/distribution/npm/facade/package.json
 @@ -1,5 +1,5 @@
  {
 -  "name": "@kjanat/actionlint",
-+  "name": "@kajaux/actionlint-rehearsal",
++  "name": "@kajaux/actionlint",
    "version": "0.0.0",
    "description": "Static checker for GitHub Actions workflow files",
    "keywords": [
@@ -480,18 +480,18 @@ index 3d1563cd2eee9f1d7ddb1d5453acbb563e8b8120..99752659d479a6d4614d6dcd722e962c
  
  	test('appends .exe on Windows only', () => {
 diff --git a/distribution/npm/facade/test/result-types.ts b/distribution/npm/facade/test/result-types.ts
-index 5d5f6e4a69acf7467267683f581c066f2a8803f5..b8d057c497894c2f7ca9bd7fba3397cad2e5ae92 100644
+index 5d5f6e4a69acf7467267683f581c066f2a8803f5..e4772ed2557c1e07cf2bf9860702f80883ac7a4b 100644
 --- a/distribution/npm/facade/test/result-types.ts
 +++ b/distribution/npm/facade/test/result-types.ts
 @@ -1,5 +1,5 @@
  // Compile against the package export, as an npm consumer would.
 -import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kjanat/actionlint/result';
-+import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kajaux/actionlint-rehearsal/result';
++import type { CheckResult, CheckResultV1, DiagnosticRecord } from '@kajaux/actionlint/result';
  
  export function completedStatus(result: CheckResult): 0 | 1 | undefined {
  	if (result.completed) return result.exit_code;
 diff --git a/distribution/npm/targets.json b/distribution/npm/targets.json
-index 5addebe055120316deca4161fd6b47f0ea1951d6..464b06a241c98f04e579b53005af6f0402a09748 100644
+index 5addebe055120316deca4161fd6b47f0ea1951d6..a0a605f17d93858181bb6f665bbad36fa7337f74 100644
 --- a/distribution/npm/targets.json
 +++ b/distribution/npm/targets.json
 @@ -1,7 +1,7 @@
@@ -499,13 +499,13 @@ index 5addebe055120316deca4161fd6b47f0ea1951d6..464b06a241c98f04e579b53005af6f04
    "$schema": "./targets.schema.json",
 -  "facade": "@kjanat/actionlint",
 -  "platformScope": "@kjanat-actionlint",
-+  "facade": "@kajaux/actionlint-rehearsal",
++  "facade": "@kajaux/actionlint",
 +  "platformScope": "@kajaux",
    "binary": "actionlint",
    "targets": [
      { "pkg": "darwin-arm64", "os": "darwin",  "cpu": "arm64", "asset": "darwin_arm64",  "format": "tar.gz", "tier": 1 },
 diff --git a/package-lock.json b/package-lock.json
-index bedbbf3c001519a76375fa37b71f11fa4d861452..59b983401e699293f547896cba071c3269e36873 100644
+index bedbbf3c001519a76375fa37b71f11fa4d861452..7505d44aa59afaf8e4c52e672a123b6079c15998 100644
 --- a/package-lock.json
 +++ b/package-lock.json
 @@ -28,7 +28,7 @@
@@ -513,7 +513,7 @@ index bedbbf3c001519a76375fa37b71f11fa4d861452..59b983401e699293f547896cba071c32
      },
      "distribution/npm/facade": {
 -      "name": "@kjanat/actionlint",
-+      "name": "@kajaux/actionlint-rehearsal",
++      "name": "@kajaux/actionlint",
        "version": "0.0.0",
        "license": "MIT",
        "dependencies": {
@@ -522,7 +522,7 @@ index bedbbf3c001519a76375fa37b71f11fa4d861452..59b983401e699293f547896cba071c32
        "license": "MIT"
      },
 -    "node_modules/@kjanat/actionlint": {
-+    "node_modules/@kajaux/actionlint-rehearsal": {
++    "node_modules/@kajaux/actionlint": {
        "resolved": "distribution/npm/facade",
        "link": true
      },
@@ -539,3 +539,171 @@ index 67e14a2ad1be8d87f2b182991b0bb135a1417855..9a94bff07ad06ec52bdca3294b81bee4
  	const checksums = await download(
  		`${base}/actionlint_${version}_checksums.txt`,
  		join(directory, 'checksums.txt'),
+diff --git a/distribution/npm/facade/README.md b/distribution/npm/facade/README.md
+index 4a1f03c89789d8ef637977d4f36a213335ce7120..f6a790659b59bc36bc51f6ee008d6f5add61aac9 100644
+--- a/distribution/npm/facade/README.md
++++ b/distribution/npm/facade/README.md
+@@ -1,21 +1,30 @@
+-# @kjanat/actionlint
++# @kajaux/actionlint
+ 
+ Static checker for GitHub Actions workflow files, distributed as a prebuilt binary.
+ 
+-This is the npm distribution of [`kjanat/actionlint`](https://github.com/kjanat/actionlint), a fork of
+-[rhysd/actionlint](https://github.com/rhysd/actionlint). Installing it puts an `actionlint` executable on your `PATH`; no
+-Go toolchain is needed.
++This GitHub Packages build comes from [`kajaux/actionlint`](https://github.com/kajaux/actionlint),
++the isolated release-test repository for [`kjanat/actionlint`](https://github.com/kjanat/actionlint).
++Installing it puts an `actionlint` executable on your `PATH`; no Go toolchain is needed.
+ 
+ ## Install
+ 
++Authenticate to GitHub Packages with a token that can read these packages:
++
+ ```sh
+-npm install --save-dev @kjanat/actionlint
++npm config set @kajaux:registry https://npm.pkg.github.com
++npm login --scope=@kajaux --auth-type=legacy --registry=https://npm.pkg.github.com
++```
++
++Then install:
++
++```sh
++npm install --save-dev @kajaux/actionlint
+ ```
+ 
+ Or run it without adding it to the project:
+ 
+ ```sh
+-npx @kjanat/actionlint
++npx @kajaux/actionlint
+ ```
+ 
+ ## Usage
+@@ -46,7 +55,7 @@ The manual page ships in the package as `man/actionlint.1`. npm registered man p
+ v11; from v12 it no longer does, so on a current npm read it directly:
+ 
+ ```sh
+-man ./node_modules/@kjanat/actionlint/man/actionlint.1
++man ./node_modules/@kajaux/actionlint/man/actionlint.1
+ ```
+ 
+ ### Configuration schema
+@@ -55,46 +64,12 @@ The package includes `actionlint.schema.json` for completion and validation in c
+ `.github/actionlint.yaml`, use the installed copy with:
+ 
+ ```yaml
+-# yaml-language-server: $schema=../node_modules/@kjanat/actionlint/actionlint.schema.json
++# yaml-language-server: $schema=../node_modules/@kajaux/actionlint/actionlint.schema.json
+ ```
+ 
+ ShellCheck directives reference `schemas/shellcheck/0.11.0.schema.json` relative
+ to the main schema. The package includes that file, so local schema validation
+-can run offline. A versioned CDN URL uses the schema from the same npm release.
+-
+-<details>
+-<summary>CDN URLs for the JSON schema</summary>
+-
+-These URLs require an npm release containing the schema:
+-
+-jsDelivr:
+-
+-```text
+-https://cdn.jsdelivr.net/npm/@kjanat/actionlint/actionlint.schema.json
+-```
+-
+-esm.sh:
+-
+-```text
+-https://esm.sh/@kjanat/actionlint/actionlint.schema.json
+-```
+-
+-UNPKG:
+-
+-```text
+-https://unpkg.com/@kjanat/actionlint/actionlint.schema.json
+-```
+-
+-For example, use jsDelivr in an editor's schema directive:
+-
+-```yaml
+-# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@kjanat/actionlint/actionlint.schema.json
+-```
+-
+-Unversioned URLs follow the latest npm release. Insert `@<version>` after `@kjanat/actionlint` to select the schema for
+-a specific release that includes it.
+-
+-</details>
++can run offline. Use the installed schema: this test package is published to GitHub Packages, not npmjs CDNs.
+ 
+ ### ShellCheck and Pyflakes
+ 
+@@ -105,21 +80,21 @@ checks.
+ ## How this package is put together
+ 
+ This package contains no binary itself. It declares one `optionalDependencies` entry per platform, each published
+-under the `@kjanat-actionlint` scope so the binaries stay out of the `@kjanat` namespace:
++under the same `@kajaux` scope:
+ 
+-| Package                                      | Runs on               |
+-| -------------------------------------------- | --------------------- |
+-| `@kjanat-actionlint/actionlint-darwin-arm64` | macOS Apple silicon   |
+-| `@kjanat-actionlint/actionlint-darwin-x64`   | macOS Intel           |
+-| `@kjanat-actionlint/actionlint-freebsd-ia32` | FreeBSD 32-bit x86    |
+-| `@kjanat-actionlint/actionlint-freebsd-x64`  | FreeBSD x86-64        |
+-| `@kjanat-actionlint/actionlint-linux-arm64`  | Linux ARM64           |
+-| `@kjanat-actionlint/actionlint-linux-arm`    | Linux ARMv6 and ARMv7 |
+-| `@kjanat-actionlint/actionlint-linux-ia32`   | Linux 32-bit x86      |
+-| `@kjanat-actionlint/actionlint-linux-x64`    | Linux x86-64          |
+-| `@kjanat-actionlint/actionlint-win32-arm64`  | Windows ARM64         |
+-| `@kjanat-actionlint/actionlint-win32-ia32`   | Windows 32-bit x86    |
+-| `@kjanat-actionlint/actionlint-win32-x64`    | Windows x86-64        |
++| Package                           | Runs on               |
++| --------------------------------- | --------------------- |
++| `@kajaux/actionlint-darwin-arm64` | macOS Apple silicon   |
++| `@kajaux/actionlint-darwin-x64`   | macOS Intel           |
++| `@kajaux/actionlint-freebsd-ia32` | FreeBSD 32-bit x86    |
++| `@kajaux/actionlint-freebsd-x64`  | FreeBSD x86-64        |
++| `@kajaux/actionlint-linux-arm64`  | Linux ARM64           |
++| `@kajaux/actionlint-linux-arm`    | Linux ARMv6 and ARMv7 |
++| `@kajaux/actionlint-linux-ia32`   | Linux 32-bit x86      |
++| `@kajaux/actionlint-linux-x64`    | Linux x86-64          |
++| `@kajaux/actionlint-win32-arm64`  | Windows ARM64         |
++| `@kajaux/actionlint-win32-ia32`   | Windows 32-bit x86    |
++| `@kajaux/actionlint-win32-x64`    | Windows x86-64        |
+ 
+ Each declares `os` and `cpu`, so your package manager downloads only the one matching your machine and skips the rest.
+ The `actionlint` command here is a small launcher that resolves that package and execs the binary inside it.
+@@ -135,8 +110,8 @@ release's published checksums before being repackaged.
+ The launcher fails with an explanation, but the usual cause is a package manager that skipped optional dependencies.
+ Reinstall without `--no-optional` or `--omit=optional`.
+ 
+-Using Bun with `minimumReleaseAge`? Add `@kjanat-actionlint/*` to `minimumReleaseAgeExcludes` alongside
+-`@kjanat/actionlint`. A fresh release otherwise installs the facade while its binaries are still age-gated.
++Using Bun with `minimumReleaseAge`? Add `@kajaux/*` to `minimumReleaseAgeExcludes` alongside
++`@kajaux/actionlint`. A fresh release otherwise installs the facade while its binaries are still age-gated.
+ 
+ ## Analysis results
+ 
+@@ -144,11 +119,11 @@ CLI `check --json` and the GitHub Action emit the same versioned result contract
+ This package ships the schema and types supported by its matching binary:
+ 
+ ```typescript
+-import type { CheckResult, DiagnosticRecord } from '@kjanat/actionlint/result';
++import type { CheckResult, DiagnosticRecord } from '@kajaux/actionlint/result';
+ ```
+ 
+-`@kjanat/actionlint/result.schema.json` exports the result schema;
+-`@kjanat/actionlint/schemas/results/v1.schema.json` selects its contract version.
++`@kajaux/actionlint/result.schema.json` exports the result schema;
++`@kajaux/actionlint/schemas/results/v1.schema.json` selects its contract version.
+ `CheckResult` describes a complete result, including failed analysis;
+ `DiagnosticRecord` describes one JSONL record. Types do not validate untrusted JSON.
+ See [the result contract](https://github.com/kjanat/actionlint/blob/master/docs/results.md)
+@@ -164,5 +139,5 @@ Homebrew, Arch (AUR), Scoop, Docker, a download script, and `go install` are all
+ MIT. See [LICENSE.txt](./LICENSE.txt).
+ 
+ [pyflakes]: https://pypi.org/project/pyflakes/
+-[releases]: https://github.com/kjanat/actionlint/releases
++[releases]: https://github.com/kajaux/actionlint/releases
+ [shellcheck]: https://www.shellcheck.net/

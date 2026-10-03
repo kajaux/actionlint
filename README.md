@@ -57,9 +57,9 @@ conflict run that left `tests` unchanged.
   and matching helper tests.
 - `004`: thin workflow-dispatch caller on the generated branch.
 
-Publication is restricted to `kajaux/actionlint`, GitHub Packages (`@kajaux`),
-and `ghcr.io/kajaux/actionlint`. The existing facade package name remains
-`@kajaux/actionlint-rehearsal`; this restructuring does not rename published packages.
+Publication is restricted to `kajaux/actionlint`, GitHub Packages
+(`@kajaux/actionlint` and `@kajaux/actionlint-*` platform packages),
+and `ghcr.io/kajaux/actionlint`.
 
 Update the patch files and their hashes together. To produce an amended patch,
 edit an expendable checkout at that patch's input tree and export
