@@ -84,9 +84,6 @@
     "tests_before": "18a2fc1614b89c49dac2359cd2f5f6a7a8c639a0",
     "tests_after": "18a2fc1614b89c49dac2359cd2f5f6a7a8c639a0"
   },
-  "automation_limitations": [
-    "GITHUB_TOKEN rejects pushes introducing workflow-file changes; the successful generated push retained existing workflow content."
-  ],
   "token_integration": {
     "secret": "TOKTOK",
     "series_sha256": "642b890256e8335345c75f2fc69438f677e0e603f1e779a355067906390d1a1d",
@@ -94,6 +91,32 @@
       "94db9e45d12063258992cbb2e1bc4ef25b60278c",
       "94db9e45d12063258992cbb2e1bc4ef25b60278c"
     ],
-    "remote_push": "pending"
+    "remote_push": "success",
+    "patch_commit": "4567dd3ca32567b5209a936284273d0aa2e3c64f",
+    "run": "https://github.com/kajaux/actionlint/actions/runs/37092465111",
+    "version": "1.18.2",
+    "previous_commit": "52bde00b1895ec38235c8e0e68883b1506351565",
+    "commit": "1f99f20ee65e15f870fdfd441c29f993608ebf62",
+    "tree": "0dac9934f1d07af8422f73c18174ecd2fa4a20cf",
+    "changed_workflow": ".github/workflows/npm-release.yml"
+  },
+  "codeql_triage": {
+    "dismissed_false_positives": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "conclusion": "success",
+    "verification_run": "https://github.com/kajaux/actionlint/actions/runs/37092514803",
+    "explanations": "Recorded individually on each GitHub alert; intentional runner or CLI-selected paths and a test-only path.",
+    "open_alerts": 0,
+    "commit": "1f99f20ee65e15f870fdfd441c29f993608ebf62"
   }
 }
