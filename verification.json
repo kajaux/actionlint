@@ -27,5 +27,64 @@
     ],
     "unchanged_from_previous_series": true,
     "obsolete_repository_references": 0
-  }
+  },
+  "copied_branches": {
+    "master": {
+      "source": "f45fbd2f408424ef20fa300d6b8386ba92a3d3d7",
+      "copy": "f45fbd2f408424ef20fa300d6b8386ba92a3d3d7"
+    },
+    "stack/action-shellcheck": {
+      "source": "0ae20ba9cfe47067e33e300fac49427effdee9f4",
+      "copy": "0ae20ba9cfe47067e33e300fac49427effdee9f4"
+    },
+    "stack/action-executable-bit": {
+      "source": "4abca31509bb8b2ac300501d17b97d9b61a450c2",
+      "copy": "4abca31509bb8b2ac300501d17b97d9b61a450c2"
+    },
+    "stack/action-composite-scripts": {
+      "source": "4cf8a665ee4acf4b01cdcff404acbc2287da08e5",
+      "copy": "4cf8a665ee4acf4b01cdcff404acbc2287da08e5"
+    },
+    "stack/action-javascript": {
+      "source": "13a75b887ee6322d1b180084d2a97c2235c61b58",
+      "copy": "13a75b887ee6322d1b180084d2a97c2235c61b58"
+    },
+    "stack/analysis-results": {
+      "source": "7918d7d2e92db78900f21a5ed296b1157baa545a",
+      "copy": "7918d7d2e92db78900f21a5ed296b1157baa545a"
+    },
+    "jiggamariggama": {
+      "source": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0",
+      "copy": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0"
+    }
+  },
+  "remote_generation": {
+    "run": "https://github.com/kajaux/actionlint/actions/runs/37082305856",
+    "conclusion": "success",
+    "updated_tests": true,
+    "source_repository": "kjanat/actionlint",
+    "source_ref": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0",
+    "source_commit": "2cf1ae998a21b78e8471945ed2fd18be4903f1f0",
+    "patch_commit": "21857c95069c186870a1bf9c37aa711bf39c452a",
+    "version": "1.18.1",
+    "changelog_date": "2026-10-02",
+    "commit": "18a2fc1614b89c49dac2359cd2f5f6a7a8c639a0",
+    "tree": "8034e9e5367e38476c8d8d31ce49900320ade95a"
+  },
+  "preserved_tags": {
+    "v1.18.0": "3f68e84c966ca62834f8fe9dce327c94cb980588",
+    "v1.18": "3f68e84c966ca62834f8fe9dce327c94cb980588",
+    "v1": "3f68e84c966ca62834f8fe9dce327c94cb980588"
+  },
+  "remote_conflict_test": {
+    "run": "https://github.com/kajaux/actionlint/actions/runs/37082523571",
+    "source_commit": "f45fbd2f408424ef20fa300d6b8386ba92a3d3d7",
+    "expected_conclusion": "failure",
+    "failed_step": "Apply the ordered patches",
+    "tests_before": "18a2fc1614b89c49dac2359cd2f5f6a7a8c639a0",
+    "tests_after": "18a2fc1614b89c49dac2359cd2f5f6a7a8c639a0"
+  },
+  "automation_limitations": [
+    "GITHUB_TOKEN rejects pushes introducing workflow-file changes; the successful generated push retained existing workflow content."
+  ]
 }
